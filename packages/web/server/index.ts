@@ -126,16 +126,17 @@ app.post("/api/generate", (req, res) => {
   const arch = (architecture ?? "layered") as Architecture;
   const target = targetFor(rt, arch, outDir);
   const wasRegenerate = existsSync(join(target, "blueprint.lock.json"));
+  const generatedAt = new Date().toISOString();
   try {
-    const result = generateBackend(blueprint, {
-      runtime: rt,
-      architecture: arch,
-      outDir: target,
-      dialect: dialect ?? "sqlite",
-    });
+    const result = generateBackend(
+      blueprint,
+      { runtime: rt, architecture: arch, outDir: target, dialect: dialect ?? "sqlite" },
+      generatedAt,
+    );
     return res.json({
       ...result,
       mode: wasRegenerate ? "regenerate" : "generate",
+      generatedAt,
       outDirRel: relative(REPO_ROOT, result.outDir),
       fileTree: listTree(result.outDir).map((f) => relative(result.outDir, f).split(sep).join("/")),
     });

@@ -17,6 +17,7 @@ type Variant = "primary" | "generate" | "ghost" | "danger";
 export function Button({
   variant = "ghost",
   children,
+  className = "",
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
   const base =
@@ -28,7 +29,7 @@ export function Button({
     danger: "border border-danger-500 text-danger-500 hover:bg-danger-050",
   };
   return (
-    <button className={`${base} ${styles[variant]}`} {...rest}>
+    <button className={`${base} ${styles[variant]} ${className}`} {...rest}>
       {children}
     </button>
   );
