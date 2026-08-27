@@ -251,9 +251,13 @@ export function GeneratePanel({
               dangerouslySetInnerHTML={{ __html: marked.parse(result.report) as string }}
             />
           )}
-          {tab === "files" && <FileExplorer dir={result.outDir} vscodeAvailable={vscodeAvailable} />}
+          {tab === "files" && (
+            <FileExplorer dir={result.outDir} vscodeAvailable={vscodeAvailable} refreshKey={result.generatedAt} />
+          )}
           {tab === "database" && <DatabaseView blueprint={blueprint} />}
-          {tab === "structure" && <StructureView blueprint={blueprint} dir={result.outDir} />}
+          {tab === "structure" && (
+            <StructureView blueprint={blueprint} dir={result.outDir} refreshKey={result.generatedAt} />
+          )}
         </div>
       )}
     </div>

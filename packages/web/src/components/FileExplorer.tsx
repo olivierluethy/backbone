@@ -16,7 +16,16 @@ const MAX_FONT = 22;
  * dragging a tab to the right), editor zoom, per-file + project Copy / Download / Open-in-VS-Code.
  * The editor is read-only — this is a viewer.
  */
-export function FileExplorer({ dir, vscodeAvailable }: { dir: string; vscodeAvailable: boolean }) {
+export function FileExplorer({
+  dir,
+  vscodeAvailable,
+  refreshKey,
+}: {
+  dir: string;
+  vscodeAvailable: boolean;
+  /** Changes on every (re)generation so the tree re-fetches even when the output dir is unchanged. */
+  refreshKey?: string;
+}) {
   const [tree, setTree] = useState<TreeNode[] | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -36,32 +45,62 @@ export function FileExplorer({ dir, vscodeAvailable }: { dir: string; vscodeAvai
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const prevDirRef = useRef<string | null>(null);
 
-  // Load the tree whenever the output dir changes; reset editor state.
+  // Load the tree when the output dir changes (full reset) or when a regeneration bumps refreshKey
+  // (soft refresh: keep open tabs that still exist, drop the ones reconciled away, re-fetch contents).
   useEffect(() => {
     let alive = true;
-    setTree(null);
-    setChecked(new Set());
-    setCache({});
-    setTabs([]);
-    setPreview(null);
-    setPrimary(null);
-    setSecondary(null);
+    const dirChanged = prevDirRef.current !== dir;
+    prevDirRef.current = dir;
+
+    if (dirChanged) {
+      setTree(null);
+      setChecked(new Set());
+      setCache({});
+      setTabs([]);
+      setPreview(null);
+      setPrimary(null);
+      setSecondary(null);
+    } else {
+      // Same dir, fresh generation: contents may have changed, so invalidate the cache.
+      setCache({});
+    }
+
     api
       .generatedTree(dir)
       .then(({ tree }) => {
         if (!alive) return;
         setTree(tree);
-        setOpen(new Set(tree.filter((n) => n.type === "dir").map((n) => n.path)));
-        const first = firstFile(tree);
-        if (first) select(first, false);
+        const files = filePaths(tree);
+        if (dirChanged) {
+          setOpen(new Set(tree.filter((n) => n.type === "dir").map((n) => n.path)));
+          const first = firstFile(tree);
+          if (first) select(first, false);
+          return;
+        }
+        // Prune tabs/preview/split that point at files removed by reconciliation.
+        setTabs((t) => t.filter((p) => files.has(p)));
+        setPreview((p) => (p && files.has(p) ? p : null));
+        setSecondary((s) => (s && files.has(s) ? s : null));
+        setChecked((prev) => new Set([...prev].filter((p) => files.has(p))));
+        // Re-fetch the still-open focused files (cache was just cleared). A vanished primary keeps
+        // its path so the editor can show a clear "file no longer exists" state.
+        for (const p of [primary, secondary]) {
+          if (p && files.has(p)) {
+            api
+              .generatedFile(dir, p)
+              .then((f) => alive && setCache((c) => ({ ...c, [p]: f })))
+              .catch(() => {});
+          }
+        }
       })
       .catch((e) => alive && setError((e as Error).message));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dir]);
+  }, [dir, refreshKey]);
 
   /** Fetch a file into the cache if not already present. */
   function ensure(path: string) {
@@ -164,8 +203,11 @@ export function FileExplorer({ dir, vscodeAvailable }: { dir: string; vscodeAvai
     return list;
   }, [tabs, preview]);
 
+  const treeFiles = useMemo(() => (tree ? filePaths(tree) : new Set<string>()), [tree]);
   const primaryFile = primary ? cache[primary] : null;
   const secondaryFile = secondary ? cache[secondary] : null;
+  const primaryMissing = !!primary && !!tree && !treeFiles.has(primary);
+  const secondaryMissing = !!secondary && !!tree && !treeFiles.has(secondary);
 
   return (
     <div className="flex flex-col gap-3">
@@ -279,7 +321,11 @@ export function FileExplorer({ dir, vscodeAvailable }: { dir: string; vscodeAvai
               }
             }}
           >
-            {primaryFile ? (
+            {primaryMissing ? (
+              <div className="min-w-0 flex-1" style={secondary ? { flex: `0 0 ${splitRatio * 100}%` } : undefined}>
+                <MissingFile path={primary!} onClose={() => closeTab(primary!)} />
+              </div>
+            ) : primaryFile ? (
               <div className="min-w-0 flex-1" style={secondary ? { flex: `0 0 ${splitRatio * 100}%` } : undefined}>
                 <CodeViewer
                   path={primaryFile.path}
@@ -311,7 +357,9 @@ export function FileExplorer({ dir, vscodeAvailable }: { dir: string; vscodeAvai
                   title="Drag to resize"
                 />
                 <div className="min-w-0 flex-1">
-                  {secondaryFile && (
+                  {secondaryMissing ? (
+                    <MissingFile path={secondary!} onClose={() => setSecondary(null)} />
+                  ) : secondaryFile && (
                     <CodeViewer
                       path={secondaryFile.path}
                       language={secondaryFile.language}
@@ -513,6 +561,38 @@ function FolderGlyph() {
     </svg>
   );
 }
+/** A clear editor state for a tab whose file was removed by a regeneration (styleguide §9.2). */
+function MissingFile({ path, onClose }: { path: string; onClose: () => void }) {
+  const name = path.split("/").pop() ?? path;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-ink-800 p-8 text-center">
+      <FileIcon name={name} size={28} />
+      <div className="text-small text-text">
+        <span className="mono text-brass-400">{name}</span> no longer exists.
+      </div>
+      <p className="max-w-sm text-small text-text-muted">
+        It was removed when the backend was regenerated for the current runtime. Pick another file
+        from the tree.
+      </p>
+      <button
+        onClick={onClose}
+        className="rounded-sm border border-rule px-3 py-1 text-eyebrow font-semibold uppercase tracking-eyebrow text-text-muted transition-colors hover:bg-ink-600 hover:text-text"
+      >
+        Close tab
+      </button>
+    </div>
+  );
+}
+
+/** Flat set of every file path in a tree, for existence checks after a refresh. */
+function filePaths(nodes: TreeNode[], out: Set<string> = new Set()): Set<string> {
+  for (const n of nodes) {
+    if (n.type === "file") out.add(n.path);
+    else if (n.children) filePaths(n.children, out);
+  }
+  return out;
+}
+
 function firstFile(nodes: TreeNode[]): string | null {
   const readme = nodes.find((n) => n.type === "file" && /readme/i.test(n.name));
   if (readme) return readme.path;

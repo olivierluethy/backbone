@@ -7,7 +7,16 @@ import { Button, Eyebrow } from "./primitives";
 
 type Mode = "entities" | "directory";
 
-export function StructureView({ blueprint, dir }: { blueprint: Blueprint; dir: string }) {
+export function StructureView({
+  blueprint,
+  dir,
+  refreshKey,
+}: {
+  blueprint: Blueprint;
+  dir: string;
+  /** Bumped on each regeneration so the directory diagram re-fetches even when dir is unchanged. */
+  refreshKey?: string;
+}) {
   const [mode, setMode] = useState<Mode>("entities");
   const [tree, setTree] = useState<TreeNode[] | null>(null);
   const [svg, setSvg] = useState<string>("");
@@ -15,7 +24,7 @@ export function StructureView({ blueprint, dir }: { blueprint: Blueprint; dir: s
 
   useEffect(() => {
     api.generatedTree(dir).then(({ tree }) => setTree(tree)).catch(() => setTree([]));
-  }, [dir]);
+  }, [dir, refreshKey]);
 
   const source = useMemo(
     () => (mode === "entities" ? entityDiagram(blueprint) : directoryDiagram(tree ?? [])),
