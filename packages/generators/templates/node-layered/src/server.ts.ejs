@@ -1,0 +1,28 @@
+import express from "express";
+import cors from "cors";
+import { env } from "./generated/config/env";
+import { apiRouter } from "./generated/routes/index";
+import { errorHandler } from "./generated/middleware/error";
+
+/**
+ * Application entry point. This file is yours — Backbone writes it once and never touches it
+ * again. The generated API lives under `src/generated/` and is mounted below; add your own
+ * routes and middleware where marked.
+ */
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+// --- Backbone-generated API ---
+app.use("/", apiRouter);
+
+// --- Add your custom routes here ---
+
+app.use(errorHandler);
+
+app.listen(env.PORT, () => {
+  console.log(`Backbone backend listening on http://localhost:${env.PORT}`);
+});

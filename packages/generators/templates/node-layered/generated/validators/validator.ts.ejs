@@ -1,0 +1,16 @@
+import { z } from "zod";
+
+/**
+ * Request validation schemas for <%= e.name %>. Generated — do not edit.
+ * `createSchema` requires all writable fields; `updateSchema` makes them optional (PATCH/PUT).
+ */
+export const createSchema = z.object({
+<% for (const c of e.writable) { -%>
+  <%= c.field %>: <%- c.zod %><%= c.nullable ? ".optional()" : "" %>,
+<% } -%>
+});
+
+export const updateSchema = createSchema.partial();
+
+export type CreateInput = z.infer<typeof createSchema>;
+export type UpdateInput = z.infer<typeof updateSchema>;

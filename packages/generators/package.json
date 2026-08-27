@@ -1,0 +1,26 @@
+{
+  "name": "@backbone/generators",
+  "version": "0.1.0",
+  "description": "Deterministic Blueprint-to-backend generators (Node + PHP) driven by EJS template sets.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "templates"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@backbone/core": "workspace:*",
+    "ejs": "^3.1.10"
+  },
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "typescript": "^5.6.3"
+  }
+}

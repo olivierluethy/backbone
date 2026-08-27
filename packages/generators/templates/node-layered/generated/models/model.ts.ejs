@@ -1,0 +1,36 @@
+<% const hasCreated = e.columns.some((c) => c.name === "created_at");
+   const hasUpdated = e.columns.some((c) => c.name === "updated_at"); -%>
+import { db } from "../config/db";
+import type { <%= e.className %> } from "../types";
+
+/**
+ * Repository for `<%= e.table %>` — thin data access over Knex. Generated — do not edit.
+ */
+const TABLE = "<%= e.table %>";
+
+export const <%= e.className %>Model = {
+  findAll(): Promise<<%= e.className %>[]> {
+    return db(TABLE).select("*");
+  },
+
+  findById(id: <%= e.pkType === "uuid" ? "string" : "number" %>): Promise<<%= e.className %> | undefined> {
+    return db(TABLE).where({ id }).first();
+  },
+
+  async create(data: Partial<<%= e.className %>>): Promise<<%= e.className %>> {
+    const row = { ...data<% if (hasCreated) { %>, createdAt: new Date().toISOString()<% } %><% if (hasUpdated) { %>, updatedAt: new Date().toISOString()<% } %> };
+    const [id] = await db(TABLE).insert(row);
+    return (await this.findById(id as <%= e.pkType === "uuid" ? "string" : "number" %>))!;
+  },
+
+  async update(id: <%= e.pkType === "uuid" ? "string" : "number" %>, data: Partial<<%= e.className %>>): Promise<<%= e.className %> | undefined> {
+    const row = { ...data<% if (hasUpdated) { %>, updatedAt: new Date().toISOString()<% } %> };
+    await db(TABLE).where({ id }).update(row);
+    return this.findById(id);
+  },
+
+  async remove(id: <%= e.pkType === "uuid" ? "string" : "number" %>): Promise<boolean> {
+    const count = await db(TABLE).where({ id }).del();
+    return count > 0;
+  },
+};

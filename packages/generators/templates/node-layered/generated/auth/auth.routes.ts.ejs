@@ -1,0 +1,10 @@
+import { Router } from "express";
+import { AuthController } from "./auth.controller";
+import { authRequired } from "../middleware/auth";
+
+/** Auth routes: register / login / me. Generated — do not edit. */
+export const authRouter = Router();
+
+authRouter.post("/auth/register", AuthController.register);
+authRouter.post("/auth/login", AuthController.login);
+authRouter.get("/auth/me", authRequired, AuthController.me);

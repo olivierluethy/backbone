@@ -1,0 +1,59 @@
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { db } from "../config/db";
+import { env } from "../config/env";
+import { HttpError } from "../middleware/error";
+
+/** Auth logic over the reserved `users` table. Generated — do not edit. */
+const TABLE = "users";
+const DEFAULT_ROLE = "<%= view.auth.roles[0] || "member" %>";
+
+interface UserRow {
+  id: number;
+  email: string;
+  passwordHash: string;
+  role: string;
+}
+
+function sign(user: { id: number; email: string; role: string }): string {
+  return jwt.sign({ id: user.id, email: user.email, role: user.role }, env.JWT_SECRET, {
+    expiresIn: env.JWT_EXPIRES_IN,
+  });
+}
+
+function publicUser(u: UserRow) {
+  return { id: u.id, email: u.email, role: u.role };
+}
+
+export const AuthService = {
+  async register(input: { email: string; password: string<% for (const c of view.authUserExtraColumns) { %>; <%= c.field %>?: <%= c.tsType %><% } %> }) {
+    const existing = await db(TABLE).where({ email: input.email }).first();
+    if (existing) throw new HttpError(409, "Email already registered");
+    const passwordHash = await bcrypt.hash(input.password, 10);
+    const [id] = await db(TABLE).insert({
+      email: input.email,
+      passwordHash,
+      role: DEFAULT_ROLE,
+<% for (const c of view.authUserExtraColumns) { -%>
+      <%= c.field %>: input.<%= c.field %> ?? null,
+<% } -%>
+      createdAt: new Date().toISOString(),
+    });
+    const user = (await db(TABLE).where({ id }).first()) as UserRow;
+    return { token: sign(user), user: publicUser(user) };
+  },
+
+  async login(input: { email: string; password: string }) {
+    const user = (await db(TABLE).where({ email: input.email }).first()) as UserRow | undefined;
+    if (!user) throw new HttpError(401, "Invalid credentials");
+    const ok = await bcrypt.compare(input.password, user.passwordHash);
+    if (!ok) throw new HttpError(401, "Invalid credentials");
+    return { token: sign(user), user: publicUser(user) };
+  },
+
+  async me(id: number) {
+    const user = (await db(TABLE).where({ id }).first()) as UserRow | undefined;
+    if (!user) throw new HttpError(404, "User not found");
+    return publicUser(user);
+  },
+};

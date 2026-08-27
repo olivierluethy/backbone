@@ -1,0 +1,22 @@
+import type { Request, Response } from "express";
+import { asyncHandler, HttpError } from "../middleware/error";
+import { AuthService } from "./auth.service";
+import { registerSchema, loginSchema } from "./auth.validators";
+
+/** Auth HTTP handlers. Generated — do not edit. */
+export const AuthController = {
+  register: asyncHandler(async (req: Request, res: Response) => {
+    const data = registerSchema.parse(req.body);
+    res.status(201).json(await AuthService.register(data));
+  }),
+
+  login: asyncHandler(async (req: Request, res: Response) => {
+    const data = loginSchema.parse(req.body);
+    res.json(await AuthService.login(data));
+  }),
+
+  me: asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) throw new HttpError(401, "Not authenticated");
+    res.json(await AuthService.me(req.user.id));
+  }),
+};

@@ -1,0 +1,10 @@
+import { Router } from "express";
+<% for (const e of view.entities) { %>import { <%= e.varName %>Router } from "./<%= e.varName %>.routes";
+<% } %><% if (auth) { %>import { authRouter } from "../auth/auth.routes";
+<% } %>
+/** Mounts every generated router. Generated — do not edit. */
+export const apiRouter = Router();
+<% if (auth) { %>
+apiRouter.use(authRouter);
+<% } %><% for (const e of view.entities) { %>apiRouter.use(<%= e.varName %>Router);
+<% } %>

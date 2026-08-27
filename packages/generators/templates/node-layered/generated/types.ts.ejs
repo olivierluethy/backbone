@@ -1,0 +1,13 @@
+/** Entity interfaces mirroring the Blueprint. Generated — do not edit. */
+<% for (const e of view.entities) { %>
+export interface <%= e.className %> {
+<% for (const c of e.columns) { %>  <%= c.field %><%= c.nullable ? "?" : "" %>: <%= c.tsType %><%= c.nullable ? " | null" : "" %>;
+<% } %>}
+<% } %>
+<% if (auth) { %>
+export interface AuthUser {
+  id: number;
+  email: string;
+<% if (view.auth.roles.length) { %>  role: <%- view.auth.roles.map((r) => JSON.stringify(r)).join(" | ") %>;
+<% } %>}
+<% } %>

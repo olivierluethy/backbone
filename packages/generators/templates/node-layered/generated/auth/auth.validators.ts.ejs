@@ -1,0 +1,15 @@
+import { z } from "zod";
+
+/** Auth request schemas. Generated — do not edit. */
+export const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+<% for (const c of view.authUserExtraColumns) { -%>
+  <%= c.field %>: <%- c.zod %>.optional(),
+<% } -%>
+});
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});

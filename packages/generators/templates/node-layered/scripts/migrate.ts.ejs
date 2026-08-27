@@ -1,0 +1,23 @@
+import knex from "knex";
+import config from "../knexfile";
+
+/** Run pending migrations (or roll back the latest batch with --rollback). */
+const db = knex(config);
+
+async function main() {
+  if (process.argv.includes("--rollback")) {
+    const [batch, files] = await db.migrate.rollback();
+    console.log(`Rolled back batch ${batch}: ${files.length ? files.join(", ") : "nothing to roll back"}`);
+  } else {
+    const [batch, files] = await db.migrate.latest();
+    if (!files.length) console.log("Already up to date.");
+    else console.log(`Batch ${batch} applied: ${files.join(", ")}`);
+  }
+}
+
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(() => db.destroy());
