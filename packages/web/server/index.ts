@@ -194,8 +194,11 @@ function targetFor(runtime: string, framework: string, architecture: string, out
 }
 
 app.get("/api/target-status", (req, res) => {
-  const runtime = String(req.query.runtime ?? "node");
-  const framework = String(req.query.framework ?? defaultFrameworkFor(runtime as Runtime));
+  const reqRuntime = String(req.query.runtime ?? "node");
+  const framework = String(req.query.framework ?? defaultFrameworkFor(reqRuntime as Runtime));
+  // The framework decides the runtime (each framework belongs to exactly one), so a stale/
+  // mismatched runtime from the client can never desync the target path.
+  const runtime = RUNTIME_OF_FRAMEWORK[framework as Framework] ?? reqRuntime;
   const architecture = String(req.query.architecture ?? "layered");
   const outDir = typeof req.query.outDir === "string" ? req.query.outDir : undefined;
   const target = targetFor(runtime, framework, architecture, outDir);
@@ -219,8 +222,10 @@ app.post("/api/generate", (req, res) => {
     outDir?: string;
   };
   if (!blueprint) return res.status(400).json({ error: "blueprint is required." });
-  const rt = (runtime ?? "node") as Runtime;
-  const fw = (framework ?? defaultFrameworkFor(rt)) as Framework;
+  const fw = (framework ?? defaultFrameworkFor((runtime ?? "node") as Runtime)) as Framework;
+  // The framework is authoritative: derive its runtime so a mismatched `runtime` from the client
+  // (e.g. a selector desync) can never produce a spurious "not a PHP framework" error.
+  const rt = (RUNTIME_OF_FRAMEWORK[fw] ?? runtime ?? "node") as Runtime;
   const arch = (architecture ?? defaultArchitectureFor(fw)) as Architecture;
   const invalid = validateCombination(rt, fw, arch);
   if (invalid) return res.status(400).json({ error: invalid });

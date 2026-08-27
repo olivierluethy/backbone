@@ -80,26 +80,46 @@ export default function App() {
 
   const caps = meta?.capabilities as Capabilities | undefined;
 
-  /** Switch runtime → pick that runtime's default framework → its default architecture. */
+  /**
+   * Switch runtime → pick that runtime's default framework → its default architecture. The
+   * framework is ALWAYS reconciled so runtime and framework can never desync (a leftover mismatch
+   * like php+express is what produced "express is not a PHP framework"). Falls back to the first
+   * framework of the runtime if the capability metadata isn't loaded yet.
+   */
   function setRuntime(next: string) {
     setRuntimeState(next);
     if (!caps) return;
-    const fw = caps.defaultFrameworkByRuntime[next as keyof typeof caps.defaultFrameworkByRuntime];
+    const fw =
+      caps.defaultFrameworkByRuntime[next as keyof typeof caps.defaultFrameworkByRuntime] ??
+      caps.frameworksByRuntime[next as keyof typeof caps.frameworksByRuntime]?.[0];
     if (fw) {
       setFrameworkState(fw);
       setArchitecture(caps.defaultArchitecture[fw]);
     }
   }
 
-  /** Switch framework and reconcile the architecture to one it supports (its default if not). */
+  /**
+   * Switch framework (the authoritative axis). Runtime follows the framework's owning runtime, and
+   * the architecture is reconciled to one the framework supports (its default if not).
+   */
   function setFramework(next: string) {
     setFrameworkState(next);
     if (!caps) return;
+    const owningRuntime = caps.runtimeOfFramework[next as keyof typeof caps.runtimeOfFramework];
+    if (owningRuntime) setRuntimeState(owningRuntime);
     const supported = caps.architecturesByFramework[next as keyof typeof caps.architecturesByFramework] ?? [];
     if (!supported.includes(architecture as never)) {
       setArchitecture(caps.defaultArchitecture[next as keyof typeof caps.defaultArchitecture]);
     }
   }
+
+  // Self-heal any runtime/framework desync once capabilities are known (e.g. a runtime switch that
+  // happened before meta loaded). The framework wins; runtime is corrected to its owning runtime.
+  useEffect(() => {
+    if (!caps) return;
+    const owning = caps.runtimeOfFramework[framework as keyof typeof caps.runtimeOfFramework];
+    if (owning && owning !== runtime) setRuntimeState(owning);
+  }, [caps, framework, runtime]);
 
   /** The blueprint actually sent to the generator: excluded fields stripped. */
   const outgoing = useMemo<Blueprint | null>(() => {
@@ -120,7 +140,17 @@ export default function App() {
     setGenerating(true);
     setGenError(null);
     try {
-      const res = await api.generate({ blueprint: outgoing, runtime, framework, architecture, dialect });
+      // The framework decides the runtime — send the derived one so a transient selector desync
+      // can never reach the server as an invalid runtime×framework pair.
+      const effectiveRuntime =
+        caps?.runtimeOfFramework[framework as keyof typeof caps.runtimeOfFramework] ?? runtime;
+      const res = await api.generate({
+        blueprint: outgoing,
+        runtime: effectiveRuntime,
+        framework,
+        architecture,
+        dialect,
+      });
       setResult(res);
       setStage(res.diff ? "regenerate" : "generate");
     } catch (e) {
