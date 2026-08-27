@@ -11,6 +11,7 @@ import { nodeFastifyPresets } from "./node-fastify.js";
 import { phpPlainPresets } from "./php-plain.js";
 import { pythonFastapiPresets } from "./python-fastapi.js";
 import { pythonDjangoPresets } from "./python-django.js";
+import { pythonFlaskPresets } from "./python-flask.js";
 
 /**
  * The preset registry. Each framework module exports one or more `Preset`s — one per
@@ -24,6 +25,7 @@ const PRESETS: Preset[] = [
   ...phpPlainPresets,
   ...pythonFastapiPresets,
   ...pythonDjangoPresets,
+  ...pythonFlaskPresets,
 ];
 
 export interface PresetInfo {

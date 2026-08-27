@@ -1,0 +1,23 @@
+"""WSGI entry point for the Backbone-generated Flask backend.
+
+Backbone writes this file once and never overwrites it — extend it freely. It builds the
+application through the create_app() factory in app/__init__.py and exposes the resulting
+WSGI callable as `app`, which is what production servers (gunicorn/uWSGI) look for:
+
+    gunicorn wsgi:app
+
+For local development you can also run this module directly (`python wsgi.py`), which starts
+Flask's built-in server on the port from the PORT environment variable (default 4200).
+"""
+import os
+
+from app import create_app
+
+# The WSGI application object discovered by `gunicorn wsgi:app` and the Flask CLI.
+app = create_app()
+
+
+if __name__ == "__main__":
+    # Development convenience only — use a real WSGI server in production.
+    port = int(os.getenv("PORT", "4200"))
+    app.run(host="0.0.0.0", port=port, debug=True)

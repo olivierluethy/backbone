@@ -1,0 +1,51 @@
+"""Application factory for the Backbone-generated Flask backend.
+
+Backbone writes this file ONCE and never touches it again — it is your entry point, safe to
+extend. Everything under `app/generated/` is owned by Backbone and regenerated wholesale.
+
+`create_app()` performs the standard Flask factory wiring:
+  1. load environment configuration from `.env` (python-dotenv),
+  2. configure the SQLAlchemy database URL,
+  3. bind the shared `db` instance to this app (db.init_app),
+  4. register every generated blueprint (entity routes<% if (auth) { %> + auth<% } %>) via register_blueprints,
+  5. create the schema at startup with `db.create_all()` inside an app context.
+
+Note on schema management: this template creates tables directly from the models on boot.
+That is perfect for development and demos. For production schema evolution, add Flask-Migrate
+(Alembic) — see the README — and drop the create_all() call below.
+"""
+import os
+
+from dotenv import load_dotenv
+from flask import Flask, jsonify
+
+from app.generated.db import db, init_db
+from app.generated.api import register_blueprints
+
+# Load .env before reading any configuration values.
+load_dotenv()
+
+
+def create_app() -> Flask:
+    """Build, configure and return the Flask application."""
+    app = Flask(__name__)
+
+    # --- Configuration (environment-driven, SQLite by default for zero setup) ---
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///./data.sqlite")
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    # --- Bind the ORM to this application ---
+    db.init_app(app)
+
+    # --- Register the Backbone-generated blueprints (entities<% if (auth) { %> + auth<% } %>) ---
+    register_blueprints(app)
+
+    # --- Create the schema at startup from the generated models ---
+    init_db(app)
+
+    # A tiny liveness probe outside the generated boundary — yours to keep or remove.
+    @app.get("/health")
+    def health():
+        return jsonify({"status": "ok"})
+
+    return app

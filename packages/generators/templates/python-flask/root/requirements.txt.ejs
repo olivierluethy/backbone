@@ -1,0 +1,14 @@
+# Python dependencies for the Backbone-generated Flask backend.
+# Flask 3 web framework + Flask-SQLAlchemy (SQLAlchemy 2 ORM). Schema is created at
+# startup with db.create_all(); PyJWT powers the optional token auth; python-dotenv
+# loads the local .env file. Pin exact versions so generated output stays reproducible.
+Flask==3.1.0
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.36
+PyJWT==2.10.1
+python-dotenv==1.0.1
+# Optional: Flask-Migrate (Alembic) for production schema migrations — see README.
+# Flask-Migrate==4.0.7
+# Optional drivers for MySQL / Postgres (uncomment as needed).
+# PyMySQL==1.1.1
+# psycopg2-binary==2.9.10
