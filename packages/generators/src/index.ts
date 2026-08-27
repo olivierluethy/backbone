@@ -1,6 +1,8 @@
 export { generateBackend, getPreset, listPresets } from "./generate.js";
 export type { GenerateResult } from "./generate.js";
 export { hasPreset } from "./presets/index.js";
+export { readManifest } from "./manifest.js";
+export type { GenerationManifest } from "./manifest.js";
 export { planMigration } from "./migrations.js";
 export { buildBlueprintView } from "./helpers.js";
 export type { BlueprintView, EntityView, ColumnView } from "./helpers.js";

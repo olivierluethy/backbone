@@ -14,6 +14,7 @@ import { buildBlueprintView } from "./helpers.js";
 import { resolveLayout } from "./layout.js";
 import { writeFiles, type WriteReport } from "./render.js";
 import { readLock, writeLock } from "./lock.js";
+import { readManifest, writeManifest, reconcileOwned } from "./manifest.js";
 import { planMigration } from "./migrations.js";
 import { buildArchitectureDoc, buildReport } from "./report.js";
 import type { GenContext, Preset } from "./types.js";
@@ -27,6 +28,10 @@ export interface GenerateResult {
   diff: BlueprintDiff | null;
   report: string;
   fileCount: number;
+  /** Owned files removed to keep the output runtime-accurate (orphans from the previous run). */
+  removed: string[];
+  /** The runtime/framework the target held before this run, when this run switched it. */
+  switchedFrom: { runtime: Runtime; framework: Framework } | null;
 }
 
 /**
@@ -53,10 +58,20 @@ export function generateBackend(
 
   const prevLock = readLock(options.outDir);
   const diff = prevLock ? diffBlueprints(prevLock, blueprint) : null;
+  const prevManifest = readManifest(options.outDir);
 
   // Project files (excludes migrations).
   const files = preset.build(ctx);
   const write = writeFiles(options.outDir, files);
+
+  // Runtime-accurate reconciliation: after writing the current output, delete owned files the
+  // previous run wrote but this one didn't (a deselected entity, or a runtime whose templates
+  // moved). Write-once user files and migrations are never in the owned set, so they are untouched.
+  const ownedFiles = files.filter((f) => f.ownership === "owned").map((f) => f.path);
+  const reconcile = reconcileOwned(options.outDir, prevManifest, ownedFiles, {
+    runtime: options.runtime,
+    framework: options.framework,
+  });
 
   // Additive migration.
   const plan = planMigration(blueprint, prevLock, dialect);
@@ -79,6 +94,14 @@ export function generateBackend(
   }
 
   writeLock(options.outDir, blueprint);
+  writeManifest(options.outDir, {
+    version: 1,
+    runtime: options.runtime,
+    framework: options.framework,
+    architecture: options.architecture,
+    ownedFiles: ownedFiles.slice().sort(),
+    generatedAt: timestamp,
+  });
 
   const report = buildReport({
     blueprint,
@@ -113,6 +136,8 @@ export function generateBackend(
     diff,
     report,
     fileCount: files.length + (migrationFilename ? 1 : 0),
+    removed: reconcile.removed,
+    switchedFrom: reconcile.switchedFrom,
   };
 }
 
