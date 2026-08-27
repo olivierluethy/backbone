@@ -1,0 +1,59 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App;
+
+use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
+use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
+use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symfony\Component\HttpKernel\Kernel as BaseKernel;
+use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
+
+/**
+ * The application kernel. This is a deliberately minimal Symfony 7 kernel — it registers only
+ * FrameworkBundle + DoctrineBundle (no Flex/security/maker bundles), autowires everything Backbone
+ * generates under `App\Generated\`, and imports the YAML config + attribute routes. It is a lean
+ * scaffold, not the full `symfony new` skeleton. Written once — add bundles and config as you grow.
+ */
+final class Kernel extends BaseKernel
+{
+    use MicroKernelTrait;
+
+    /**
+     * Register the bundles the generated app needs. `MicroKernelTrait` would normally read
+     * `config/bundles.php`; we list them here instead to keep the scaffold self-contained.
+     */
+    public function registerBundles(): iterable
+    {
+        yield new FrameworkBundle();
+        yield new DoctrineBundle();
+    }
+
+    /**
+     * Import the package config and register the generated services. Controllers, repositories
+     * and security helpers are autowired + autoconfigured; Doctrine entities are plain data
+     * objects (not services) and are therefore excluded from the service container.
+     */
+    protected function configureContainer(ContainerConfigurator $container): void
+    {
+        $container->import(__DIR__ . '/../config/packages/*.yaml');
+
+        $services = $container->services()
+            ->defaults()
+            ->autowire()
+            ->autoconfigure()
+            // Bind the app secret so App\Generated\Security\TokenManager receives it by name.
+            ->bind('string $appSecret', '%env(APP_SECRET)%');
+
+        $services->load('App\\Generated\\', __DIR__ . '/Generated/')
+            ->exclude([__DIR__ . '/Generated/Entity/']);
+    }
+
+    /** Load every `#[Route]` attribute route declared by the generated controllers. */
+    protected function configureRoutes(RoutingConfigurator $routes): void
+    {
+        $routes->import(__DIR__ . '/../config/routes.yaml');
+    }
+}

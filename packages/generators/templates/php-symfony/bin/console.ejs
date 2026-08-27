@@ -1,0 +1,20 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Symfony console entry point (`php bin/console ...`). This file is YOURS — written once. It is
+ * how you run `doctrine:schema:update --force` and any other command. Backbone never edits it.
+ */
+
+use App\Kernel;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+
+require_once dirname(__DIR__) . '/vendor/autoload_runtime.php';
+
+return static function (array $context): Application {
+    $kernel = new Kernel($context['APP_ENV'], (bool) $context['APP_DEBUG']);
+
+    return new Application($kernel);
+};
