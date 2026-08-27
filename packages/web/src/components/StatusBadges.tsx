@@ -81,15 +81,21 @@ export function StatusBadges({
   );
 }
 
-/** Locale-formatted "27 Aug 2026, 18:14" with graceful fallback. */
+/**
+ * English-locale "27 Aug 2026, 10:41 PM" (never the host locale, which leaked non-English strings
+ * like "27 ago 2026, 10:41 p.m."). The raw ISO is kept in the badge `title`.
+ */
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return d
+    .toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .replace(/\b(am|pm)\b/i, (m) => m.toUpperCase());
 }
