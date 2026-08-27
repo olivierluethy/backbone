@@ -1,0 +1,22 @@
+{
+  "name": "@backbone/cli",
+  "version": "0.1.0",
+  "description": "The `bb` CLI: analyze | review | generate | regenerate | presets.",
+  "type": "module",
+  "bin": {
+    "bb": "./dist/cli.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@backbone/analyzer": "workspace:*",
+    "@backbone/core": "workspace:*",
+    "@backbone/generators": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.0",
+    "typescript": "^5.6.3"
+  }
+}
