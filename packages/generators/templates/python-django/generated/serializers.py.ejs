@@ -1,0 +1,17 @@
+"""Generated DRF serializers. Do not edit — regenerated wholesale by Backbone."""
+from rest_framework import serializers
+
+from .models import <%= view.entities.map((e) => e.className).join(", ") %>
+
+<% for (const e of view.entities) { -%>
+<% const fks = e.columns.filter((c) => c.fkTo); -%>
+
+class <%= e.className %>Serializer(serializers.ModelSerializer):
+<% for (const c of fks) { -%>
+    <%= c.name %> = serializers.IntegerField(<%= c.nullable ? "required=False, allow_null=True" : "" %>)
+<% } -%>
+
+    class Meta:
+        model = <%= e.className %>
+        fields = [<%- e.columns.map((c) => JSON.stringify(c.name)).join(", ") %>]
+<% } -%>

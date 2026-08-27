@@ -1,0 +1,22 @@
+"""Generated URL patterns. Do not edit — regenerated wholesale by Backbone."""
+from rest_framework.routers import DefaultRouter
+
+from . import views
+<% if (auth) { -%>
+from django.urls import path
+
+from .auth import LoginView, MeView, RegisterView
+<% } -%>
+
+router = DefaultRouter(trailing_slash=False)
+<% for (const e of view.entities) { -%>
+router.register(r"<%= e.table %>", views.<%= e.className %>ViewSet, basename="<%= e.varName %>")
+<% } -%>
+
+urlpatterns = [
+<% if (auth) { -%>
+    path("auth/register", RegisterView.as_view()),
+    path("auth/login", LoginView.as_view()),
+    path("auth/me", MeView.as_view()),
+<% } -%>
+] + router.urls

@@ -1,0 +1,22 @@
+"""Generated DRF viewsets (only the endpoints detected in the frontend). Do not edit."""
+from rest_framework import mixins, viewsets
+
+from .models import <%= view.entities.map((e) => e.className).join(", ") %>
+from .serializers import <%= view.entities.map((e) => e.className + "Serializer").join(", ") %>
+<% if (auth) { -%>
+from .permissions import ReadOnlyOrAuthenticated
+<% } -%>
+
+<% const MIX = { list: "mixins.ListModelMixin", read: "mixins.RetrieveModelMixin", create: "mixins.CreateModelMixin", update: "mixins.UpdateModelMixin", delete: "mixins.DestroyModelMixin" }; -%>
+<% for (const e of view.entities) { -%>
+<% const ops = new Set(e.endpoints.map((ep) => ep.operation));
+   const bases = Object.keys(MIX).filter((o) => ops.has(o)).map((o) => MIX[o]);
+   bases.push("viewsets.GenericViewSet"); -%>
+
+class <%= e.className %>ViewSet(<%= bases.join(", ") %>):
+    queryset = <%= e.className %>.objects.all()
+    serializer_class = <%= e.className %>Serializer
+<% if (auth) { -%>
+    permission_classes = [ReadOnlyOrAuthenticated]
+<% } -%>
+<% } -%>

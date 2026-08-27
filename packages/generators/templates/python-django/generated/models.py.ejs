@@ -1,0 +1,34 @@
+"""Generated Django models. Do not edit — regenerated wholesale by Backbone."""
+from django.db import models
+<% if (auth) { -%>
+from django.contrib.auth.models import AbstractUser
+
+
+class User(AbstractUser):
+    """The reserved auth user (folds in any detected User entity's extra columns)."""
+
+    role = models.CharField(max_length=64, default="<%= view.auth.roles[0] || "member" %>")
+<% for (const c of view.authUserExtraColumns) { -%>
+    <%= dj.fieldName(c) %> = <%- dj.modelField(c) %>
+<% } -%>
+
+    class Meta:
+        app_label = "api"
+        db_table = "users"
+<% } -%>
+<% for (const e of view.entities) { -%>
+
+
+class <%= e.className %>(models.Model):
+<% for (const c of e.columns) { -%>
+<% if (c.primaryKey && c.type === "uuid") { -%>
+    id = models.CharField(primary_key=True, max_length=36)
+<% } else if (!c.primaryKey) { -%>
+    <%= dj.fieldName(c) %> = <%- dj.modelField(c, c.fkTo) %>
+<% } -%>
+<% } -%>
+
+    class Meta:
+        app_label = "api"
+        db_table = "<%= e.table %>"
+<% } -%>
