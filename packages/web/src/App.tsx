@@ -9,6 +9,7 @@ import { Rail, type Stage } from "./components/Rail";
 import { BlueprintCanvas } from "./components/BlueprintCanvas";
 import { AuthSummary, EndpointsTable } from "./components/EndpointsTable";
 import { GeneratePanel } from "./components/GeneratePanel";
+import { FolderPicker } from "./components/FolderPicker";
 import { Button, Eyebrow } from "./components/primitives";
 
 export default function App() {
@@ -18,9 +19,10 @@ export default function App() {
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [stage, setStage] = useState<Stage>("analyze");
 
-  const [runtime, setRuntime] = useState("node");
+  const [runtime, setRuntimeState] = useState("node");
   const [architecture, setArchitecture] = useState("layered");
   const [dialect, setDialect] = useState("sqlite");
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -74,6 +76,13 @@ export default function App() {
     });
   }
 
+  /** Switch runtime and reconcile the architecture/framework to one that runtime supports. */
+  function setRuntime(next: string) {
+    setRuntimeState(next);
+    const archs = (meta?.presets ?? []).filter((p) => p.runtime === next).map((p) => p.architecture);
+    if (archs.length && !archs.includes(architecture)) setArchitecture(archs[0]);
+  }
+
   /** The blueprint actually sent to the generator: excluded fields stripped. */
   const outgoing = useMemo<Blueprint | null>(() => {
     if (!blueprint) return null;
@@ -124,14 +133,23 @@ export default function App() {
         {/* top bar */}
         <header className="flex flex-wrap items-center gap-3 border-b border-line bg-ink-900 px-6 py-3">
           <label className="eyebrow">Frontend</label>
-          <input
-            value={frontendPath}
-            onChange={(e) => setFrontendPath(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && analyze()}
-            spellCheck={false}
-            className="mono min-w-[240px] flex-1 rounded-md border border-rule bg-ink-800 px-3 py-1.5 text-text focus:border-brass-400"
-            placeholder="path to a React + TS project"
-          />
+          <div className="flex min-w-[240px] flex-1 items-stretch overflow-hidden rounded-md border border-rule bg-ink-800 focus-within:border-brass-400">
+            <input
+              value={frontendPath}
+              onChange={(e) => setFrontendPath(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && analyze()}
+              spellCheck={false}
+              className="mono min-w-0 flex-1 bg-transparent px-3 py-1.5 text-text outline-none"
+              placeholder="path to a React + TS project"
+            />
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="border-l border-rule px-3 text-small font-semibold text-text-muted hover:bg-ink-600 hover:text-text"
+              title="Browse for a folder"
+            >
+              Browse…
+            </button>
+          </div>
           <Button variant="primary" onClick={analyze} disabled={analyzing}>
             {analyzing ? "Analyzing…" : "Analyze"}
           </Button>
@@ -179,14 +197,12 @@ export default function App() {
 
           {blueprint && (stage === "generate" || stage === "regenerate") && (
             <GeneratePanel
+              blueprint={outgoing ?? blueprint}
               presets={meta?.presets ?? []}
               runtime={runtime}
               architecture={architecture}
               dialect={dialect}
-              setRuntime={(r) => {
-                setRuntime(r);
-                if (r === "php") setArchitecture("layered");
-              }}
+              setRuntime={setRuntime}
               setArchitecture={setArchitecture}
               setDialect={setDialect}
               onGenerate={generate}
@@ -197,6 +213,16 @@ export default function App() {
           )}
         </main>
       </div>
+
+      <FolderPicker
+        open={pickerOpen}
+        initialPath={frontendPath && frontendPath.startsWith("/") ? frontendPath : meta?.repoRoot}
+        onSelect={(path) => {
+          setFrontendPath(path);
+          setPickerOpen(false);
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
     </div>
   );
 }

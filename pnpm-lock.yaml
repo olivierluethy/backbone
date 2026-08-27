@@ -122,6 +122,9 @@ importers:
       prism-react-renderer:
         specifier: ^2.4.1
         version: 2.4.1(react@18.3.1)
+      prismjs:
+        specifier: ^1.29.0
+        version: 1.30.0
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -141,6 +144,9 @@ importers:
       '@types/node':
         specifier: ^20.16.0
         version: 20.19.43
+      '@types/prismjs':
+        specifier: ^1.26.5
+        version: 1.26.6
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.31
@@ -1919,6 +1925,10 @@ packages:
     resolution: {integrity: sha512-ey8Ls/+Di31eqzUxC46h8MksNuGx/n0AAC8uKpwFau4RPDYLuE3EXTp8N8G2vX2N7UC/+IXeNUnlWBGGcAG+Ig==}
     peerDependencies:
       react: '>=16.0.0'
+
+  prismjs@1.30.0:
+    resolution: {integrity: sha512-DEvV2ZF2r2/63V+tK8hQvrR2ZGn10srHbXviTlcv7Kpzw8jWiNTqbVgjO3IY8RxrrOUF8VPMQQFysYYYv0YZxw==}
+    engines: {node: '>=6'}
 
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
@@ -3932,6 +3942,8 @@ snapshots:
       '@types/prismjs': 1.26.6
       clsx: 2.1.1
       react: 18.3.1
+
+  prismjs@1.30.0: {}
 
   process-nextick-args@2.0.1: {}
 

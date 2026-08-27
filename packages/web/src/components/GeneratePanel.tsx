@@ -1,7 +1,11 @@
+import { useEffect, useState } from "react";
 import { marked } from "marked";
-import { summarizeDiff, type BlueprintDiff } from "@backbone/core";
-import type { GenerateResult, PresetInfo } from "../api";
+import { summarizeDiff, type Blueprint, type BlueprintDiff } from "@backbone/core";
+import { api, type GenerateResult, type PresetInfo, type TargetStatus } from "../api";
 import { Button, Eyebrow } from "./primitives";
+import { StatusBadges } from "./StatusBadges";
+import { FileExplorer } from "./FileExplorer";
+import { StructureView } from "./StructureView";
 
 /** A labelled segmented control. */
 function Segmented<T extends string>({
@@ -24,7 +28,7 @@ function Segmented<T extends string>({
             key={o.value}
             disabled={o.disabled}
             onClick={() => onChange(o.value)}
-            className={`rounded-sm px-3 py-1 text-small font-medium transition-colors disabled:opacity-30 ${
+            className={`rounded-sm px-3 py-1 text-small font-medium capitalize transition-colors disabled:opacity-30 ${
               value === o.value ? "bg-ink-600 text-text" : "text-text-muted hover:text-text"
             }`}
           >
@@ -36,7 +40,10 @@ function Segmented<T extends string>({
   );
 }
 
+type Tab = "report" | "files" | "structure";
+
 export function GeneratePanel({
+  blueprint,
   presets,
   runtime,
   architecture,
@@ -49,6 +56,7 @@ export function GeneratePanel({
   result,
   error,
 }: {
+  blueprint: Blueprint;
   presets: PresetInfo[];
   runtime: string;
   architecture: string;
@@ -61,17 +69,41 @@ export function GeneratePanel({
   result: GenerateResult | null;
   error: string | null;
 }) {
+  const [status, setStatus] = useState<TargetStatus | null>(null);
+  const [tab, setTab] = useState<Tab>("report");
+
   const runtimes = [...new Set(presets.map((p) => p.runtime))];
   const archsForRuntime = presets.filter((p) => p.runtime === runtime).map((p) => p.architecture);
+  const isPython = runtime === "python";
+  const archLabel = isPython ? "Framework" : "Architecture";
+
+  // What mode would run right now (generate vs regenerate) at the resolved target?
+  useEffect(() => {
+    let alive = true;
+    api
+      .targetStatus(runtime, architecture)
+      .then((s) => alive && setStatus(s))
+      .catch(() => alive && setStatus(null));
+    return () => {
+      alive = false;
+    };
+  }, [runtime, architecture, result]);
+
+  useEffect(() => {
+    if (result) setTab("report");
+  }, [result]);
+
+  const willRegenerate = status?.mode === "regenerate";
   const diffLines = result?.diff ? summarizeDiff(result.diff as BlueprintDiff) : [];
 
   return (
     <div>
       <Eyebrow>Generate</Eyebrow>
-      <p className="mt-1 mb-4 text-small text-text-muted">
-        Choose a runtime and architecture, then generate. Re-generating into the same output is
-        additive — only the generated boundary is overwritten, and a new migration is added for
-        schema changes.
+      <p className="mt-1 mb-4 max-w-3xl text-small text-text-muted">
+        <span className="text-text">Generate</span> writes the backend into an empty target.{" "}
+        <span className="text-text">Regenerate</span> re-runs against an existing target: it diffs the
+        Blueprint, appends an additive migration for schema changes, and overwrites only the generated
+        boundary — your own files are preserved.
       </p>
 
       <div className="flex flex-wrap items-end gap-6 rounded-md border border-line bg-surface p-4">
@@ -82,14 +114,10 @@ export function GeneratePanel({
           options={runtimes.map((r) => ({ value: r, label: r }))}
         />
         <Segmented
-          label="Architecture"
+          label={archLabel}
           value={architecture}
           onChange={setArchitecture}
-          options={["layered", "modular"].map((a) => ({
-            value: a,
-            label: a,
-            disabled: !archsForRuntime.includes(a as "layered" | "modular"),
-          }))}
+          options={[...new Set(archsForRuntime)].map((a) => ({ value: a, label: a }))}
         />
         <Segmented
           label="Datastore"
@@ -100,10 +128,34 @@ export function GeneratePanel({
             { value: "mysql", label: "mysql" },
           ]}
         />
-        <Button variant="generate" onClick={onGenerate} disabled={generating}>
-          {generating ? "Generating…" : "Generate backend"}
-        </Button>
+        <div className="flex flex-col gap-1">
+          <Button variant={willRegenerate ? "primary" : "generate"} onClick={onGenerate} disabled={generating}>
+            {generating
+              ? willRegenerate
+                ? "Regenerating…"
+                : "Generating…"
+              : willRegenerate
+                ? "Regenerate backend"
+                : "Generate backend"}
+          </Button>
+        </div>
       </div>
+
+      {status && (
+        <p className="mt-2 text-small text-text-muted">
+          {willRegenerate ? (
+            <>
+              <span className="text-brass-400">Regenerate</span> — target{" "}
+              <span className="mono">{status.targetRel}</span> already exists (has a lock).
+            </>
+          ) : (
+            <>
+              <span className="text-verd-400">Generate</span> — new target{" "}
+              <span className="mono">{status.targetRel}</span>.
+            </>
+          )}
+        </p>
+      )}
 
       {error && (
         <div className="mt-4 rounded-md border border-danger-500/50 bg-danger-050 p-3 text-small text-danger-500">
@@ -112,19 +164,14 @@ export function GeneratePanel({
       )}
 
       {result && (
-        <div className="mt-6 space-y-6">
-          <div className="rounded-md border border-verd-500/40 bg-verd-050 p-4">
-            <div className="text-body text-verd-400">
-              Generated <span className="font-semibold">{result.presetId}</span> →{" "}
-              <span className="mono">{result.outDirRel}</span>
-            </div>
-            <div className="mt-1 text-small text-text-muted">
-              {result.write.written.length} written · {result.write.skipped.length} preserved ·{" "}
-              {result.migrationFilename
-                ? `migration ${result.migrationFilename}`
-                : "no migration change"}
-            </div>
-          </div>
+        <div className="mt-6 space-y-5">
+          <StatusBadges
+            result={result}
+            blueprint={blueprint}
+            runtime={runtime}
+            architecture={architecture}
+            dialect={dialect}
+          />
 
           {diffLines.length > 0 && (
             <div>
@@ -139,29 +186,29 @@ export function GeneratePanel({
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
-            <div>
-              <Eyebrow>Generation report</Eyebrow>
-              <div
-                className="report-md mt-2 max-h-[50vh] overflow-auto rounded-md border border-line bg-surface p-4"
-                dangerouslySetInnerHTML={{ __html: marked.parse(result.report) as string }}
-              />
-            </div>
-            <div>
-              <Eyebrow count={result.fileTree.length}>Files</Eyebrow>
-              <div className="mono mt-2 max-h-[50vh] overflow-auto rounded-md border border-line bg-ink-800 p-3 text-text-muted">
-                {result.fileTree.map((f) => (
-                  <div key={f} className="whitespace-pre">
-                    {f.includes("generated") || f.includes("Generated") ? (
-                      <span className="text-verd-400">{f}</span>
-                    ) : (
-                      f
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Tabbed results */}
+          <div className="flex gap-1 border-b border-line">
+            {(["report", "files", "structure"] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`-mb-px border-b-2 px-3 py-2 text-small font-medium capitalize transition-colors ${
+                  tab === t ? "border-brass-500 text-text" : "border-transparent text-text-muted hover:text-text"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
           </div>
+
+          {tab === "report" && (
+            <div
+              className="report-md max-h-[62vh] overflow-auto rounded-md border border-line bg-surface p-4"
+              dangerouslySetInnerHTML={{ __html: marked.parse(result.report) as string }}
+            />
+          )}
+          {tab === "files" && <FileExplorer dir={result.outDir} />}
+          {tab === "structure" && <StructureView blueprint={blueprint} dir={result.outDir} />}
         </div>
       )}
     </div>
