@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Generated\Middleware;
+
+use App\Generated\Config\Env;
+use App\Generated\Support\HttpException;
+use App\Generated\Support\Request;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+
+/** Verifies the Bearer token and returns the payload, or throws 401. Generated — do not edit. */
+final class AuthMiddleware
+{
+    /** @return array{id: int, email: string, role: string} */
+    public static function authenticate(): array
+    {
+        $header = Request::authorization() ?? '';
+        if (!str_starts_with($header, 'Bearer ')) {
+            throw new HttpException(401, 'Missing bearer token');
+        }
+        $token = substr($header, 7);
+        try {
+            $secret = Env::get('JWT_SECRET', 'change-me-in-production');
+            $payload = JWT::decode($token, new Key((string) $secret, 'HS256'));
+        } catch (\Throwable) {
+            throw new HttpException(401, 'Invalid or expired token');
+        }
+        return [
+            'id' => (int) ($payload->id ?? 0),
+            'email' => (string) ($payload->email ?? ''),
+            'role' => (string) ($payload->role ?? ''),
+        ];
+    }
+
+    /**
+     * Restrict to specific roles. Call after authenticate().
+     *
+     * @param array{id: int, email: string, role: string}|null $user
+     */
+    public static function requireRole(?array $user, string ...$roles): void
+    {
+        if ($user === null) {
+            throw new HttpException(401, 'Not authenticated');
+        }
+        if ($roles !== [] && !in_array($user['role'], $roles, true)) {
+            throw new HttpException(403, 'Insufficient role');
+        }
+    }
+}
