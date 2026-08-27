@@ -1,0 +1,75 @@
+<% const hasCreated = e.columns.some((c) => c.name === "created_at");
+   const hasUpdated = e.columns.some((c) => c.name === "updated_at");
+   const boolFields = e.columns.filter((c) => c.type === "boolean").map((c) => c.field);
+   const jsonFields = e.columns.filter((c) => c.type === "json").map((c) => c.field);
+   const idTs = e.pkType === "uuid" ? "string" : "number"; -%>
+import { db } from "../config/db";
+import type { <%= e.className %> } from "../schemas/<%= e.varName %>.schema";
+
+/**
+ * Repository (data-access layer) for `<%= e.table %>` — thin CRUD over Knex. Generated — do not edit.
+ * Knex is configured (see config/db.ts) to translate camelCase <-> snake_case automatically, so all
+ * column names here are written in camelCase.
+ */
+const TABLE = "<%= e.table %>";
+<% if (boolFields.length) { -%>
+// SQLite has no native boolean; these fields are stored as 0/1 and decoded back to booleans.
+const BOOL_FIELDS = [<%- boolFields.map((f) => JSON.stringify(f)).join(", ") %>] as const;
+<% } -%>
+<% if (jsonFields.length) { -%>
+// JSON fields are persisted as text and (de)serialised on the way in/out.
+const JSON_FIELDS = [<%- jsonFields.map((f) => JSON.stringify(f)).join(", ") %>] as const;
+<% } -%>
+
+/** Decode a raw DB row into a fully-typed <%= e.className %> (booleans/json restored). */
+function decode(row: any): <%= e.className %> {
+<% if (boolFields.length) { -%>
+  for (const f of BOOL_FIELDS) if (row?.[f] != null) row[f] = Boolean(row[f]);
+<% } -%>
+<% if (jsonFields.length) { -%>
+  for (const f of JSON_FIELDS) if (typeof row?.[f] === "string") { try { row[f] = JSON.parse(row[f]); } catch { /* leave as-is */ } }
+<% } -%>
+  return row;
+}
+
+/** Encode a payload for storage (json objects -> text). */
+function encode(data: Partial<<%= e.className %>>): Record<string, unknown> {
+  const row: Record<string, unknown> = { ...data };
+<% if (jsonFields.length) { -%>
+  for (const f of JSON_FIELDS) if (row[f] != null && typeof row[f] !== "string") row[f] = JSON.stringify(row[f]);
+<% } -%>
+  return row;
+}
+
+export const <%= e.className %>Model = {
+  /** Return every <%= e.name %> row. */
+  async findAll(): Promise<<%= e.className %>[]> {
+    return (await db(TABLE).select("*")).map(decode);
+  },
+
+  /** Return a single <%= e.name %> by primary key, or undefined if none. */
+  async findById(id: <%= idTs %>): Promise<<%= e.className %> | undefined> {
+    const row = await db(TABLE).where({ id }).first();
+    return row ? decode(row) : undefined;
+  },
+
+  /** Insert a new <%= e.name %><% if (hasCreated || hasUpdated) { %> (managed timestamps set here)<% } %> and return the persisted row. */
+  async create(data: Partial<<%= e.className %>>): Promise<<%= e.className %>> {
+    const row = { ...encode(data)<% if (hasCreated) { %>, createdAt: new Date().toISOString()<% } %><% if (hasUpdated) { %>, updatedAt: new Date().toISOString()<% } %> };
+    const [id] = await db(TABLE).insert(row);
+    return (await this.findById(id as <%= idTs %>))!;
+  },
+
+  /** Apply a partial update to a <%= e.name %><% if (hasUpdated) { %> (updatedAt refreshed)<% } %> and return the new row, or undefined. */
+  async update(id: <%= idTs %>, data: Partial<<%= e.className %>>): Promise<<%= e.className %> | undefined> {
+    const row = { ...encode(data)<% if (hasUpdated) { %>, updatedAt: new Date().toISOString()<% } %> };
+    await db(TABLE).where({ id }).update(row);
+    return this.findById(id);
+  },
+
+  /** Delete a <%= e.name %> by primary key; returns true when a row was removed. */
+  async remove(id: <%= idTs %>): Promise<boolean> {
+    const count = await db(TABLE).where({ id }).del();
+    return count > 0;
+  },
+};

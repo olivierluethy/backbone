@@ -1,0 +1,69 @@
+<% const ops = new Set(e.endpoints.map((ep) => ep.operation));
+   const needCreate = ops.has("create");
+   const needUpdate = ops.has("update");
+   const needsId = ops.has("read") || ops.has("update") || ops.has("delete");
+   const idCast = e.pkType === "uuid" ? "id" : "Number(id)"; -%>
+import type { FastifyReply, FastifyRequest } from "fastify";
+import { <%= e.className %>Service } from "../services/<%= e.varName %>.service";
+<% if (needCreate || needUpdate) { -%>
+import { <%= [needCreate ? "createSchema" : null, needUpdate ? "updateSchema" : null].filter(Boolean).join(", ") %> } from "../schemas/<%= e.varName %>.schema";
+<% } -%>
+
+/**
+ * Fastify route handlers for <%= e.name %>. Generated — do not edit.
+ *
+ * Each handler is a plain async function: it returns a value that Fastify serialises to JSON, or
+ * throws — validation failures (zod) and "not found" errors (HttpError) are translated to the
+ * right status codes by the shared error handler (see lib/http-error.ts). The `:id` route param
+ * arrives as a string and is read via `readId` below.
+ */
+<% if (needsId) { -%>
+/** Read the `:id` path parameter (always a string on the wire) for this entity's item routes. */
+function readId(request: FastifyRequest): string {
+  return (request.params as { id: string }).id;
+}
+<% } -%>
+
+export const <%= e.className %>Controller = {
+<% if (ops.has("list")) { -%>
+  /** GET collection — return every <%= e.name %>. */
+  async index(_request: FastifyRequest, _reply: FastifyReply) {
+    return <%= e.className %>Service.list();
+  },
+
+<% } -%>
+<% if (ops.has("read")) { -%>
+  /** GET item — return one <%= e.name %> by id (404 if missing). */
+  async show(request: FastifyRequest, _reply: FastifyReply) {
+    const id = readId(request);
+    return <%= e.className %>Service.get(<%= idCast %>);
+  },
+
+<% } -%>
+<% if (needCreate) { -%>
+  /** POST — validate the body, create a <%= e.name %>, respond 201. */
+  async store(request: FastifyRequest, reply: FastifyReply) {
+    const data = createSchema.parse(request.body);
+    reply.code(201);
+    return <%= e.className %>Service.create(data);
+  },
+
+<% } -%>
+<% if (needUpdate) { -%>
+  /** PATCH/PUT — validate the partial body and update the <%= e.name %> (404 if missing). */
+  async update(request: FastifyRequest, _reply: FastifyReply) {
+    const id = readId(request);
+    const data = updateSchema.parse(request.body);
+    return <%= e.className %>Service.update(<%= idCast %>, data);
+  },
+
+<% } -%>
+<% if (ops.has("delete")) { -%>
+  /** DELETE — remove the <%= e.name %> (404 if missing) and respond 204 with no body. */
+  async destroy(request: FastifyRequest, reply: FastifyReply) {
+    const id = readId(request);
+    await <%= e.className %>Service.remove(<%= idCast %>);
+    return reply.code(204).send();
+  },
+<% } -%>
+};

@@ -1,0 +1,17 @@
+import { Module } from "@nestjs/common";
+import { GeneratedModule } from "./generated/generated.module";
+
+/**
+ * Root application module. This file is YOURS — Backbone writes it once and never overwrites it.
+ * It imports `GeneratedModule`, which wires up the TypeORM datasource and every generated
+ * feature module (<%= view.entities.map((e) => e.name).join(", ") || "no entities yet" %><% if (auth) { %>, plus authentication<% } %>).
+ *
+ * Add your own modules, providers and controllers to the `imports`/`providers` arrays below.
+ */
+@Module({
+  imports: [
+    GeneratedModule,
+    // --- Add your custom modules here ---
+  ],
+})
+export class AppModule {}

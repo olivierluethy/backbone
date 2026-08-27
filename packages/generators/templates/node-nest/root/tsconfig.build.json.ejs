@@ -1,0 +1,6 @@
+{
+  // Production build config used by `nest build`: inherits the base tsconfig but drops test
+  // and build artefacts from the compilation so only shippable source is emitted to dist/.
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+}

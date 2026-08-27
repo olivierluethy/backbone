@@ -7,13 +7,15 @@ const DIR = "php-layered";
 const G = "app/Generated"; // the owned boundary
 
 /**
- * PHP 8.3 + PDO, layered architecture. All generated code lives under `app/Generated/`
- * (the owned boundary, PSR-4 `App\Generated\`). A thin `public/index.php` outside it is
- * written once and is the developer's to extend. Deterministic, no AI.
+ * Plain PHP 8.3 + PDO, layered architecture — the dependency-free baseline framework. All
+ * generated code lives under `app/Generated/` (the owned boundary, PSR-4 `App\Generated\`).
+ * A thin `public/index.php` outside it is written once and is the developer's to extend.
+ * Deterministic, no AI.
  */
-export const phpLayeredPreset: Preset = {
-  id: "php-layered",
+const phpPlainLayered: Preset = {
+  id: "php-plain-layered",
   runtime: "php",
+  framework: "php-plain",
   architecture: "layered",
   templateDir: DIR,
 
@@ -76,6 +78,8 @@ export const phpLayeredPreset: Preset = {
     };
   },
 };
+
+export const phpPlainPresets: Preset[] = [phpPlainLayered];
 
 /* ------------------------------------------------------------------ *
  * Deterministic SQL DDL — computed here so the template stays dumb.

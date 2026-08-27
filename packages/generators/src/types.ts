@@ -1,5 +1,6 @@
-import type { Blueprint, GenerateOptions } from "@backbone/core";
+import type { Architecture, Blueprint, Framework, GenerateOptions, Runtime } from "@backbone/core";
 import type { BlueprintView, ColumnView, EntityView } from "./helpers.js";
+import type { Layout } from "./layout.js";
 
 /** Where a generated file sits relative to the ownership boundary. */
 export type Ownership =
@@ -51,6 +52,8 @@ export interface GenContext {
   blueprint: Blueprint;
   view: BlueprintView;
   options: GenerateOptions;
+  /** Resolved directory layout for the chosen architecture. */
+  layout: Layout;
 }
 
 /** Sequencing context for a migration, so chained schemes (e.g. Alembic) can link revisions. */
@@ -63,11 +66,12 @@ export interface MigrationContext {
   revision: string;
 }
 
-/** A pluggable template set for one runtime + architecture. */
+/** A pluggable template set for one (runtime, framework, architecture) triple. */
 export interface Preset {
   id: string;
-  runtime: "node" | "php" | "python";
-  architecture: "layered" | "modular" | "fastapi" | "django";
+  runtime: Runtime;
+  framework: Framework;
+  architecture: Architecture;
   /** Directory name of this preset's EJS templates under `templates/`. */
   templateDir: string;
   /** Migration file extension without the dot (default derived from runtime). */

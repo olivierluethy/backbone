@@ -132,6 +132,21 @@
   .report-md strong {
     color: var(--text);
   }
+
+  /* Transient toast entrance (§8.2). */
+  .toast-in {
+    animation: toast-rise 180ms ease;
+  }
+  @keyframes toast-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,0 +1,31 @@
+import { z } from "zod";
+
+/**
+ * Types and request-validation schemas for the `<%= e.table %>` entity (<%= e.name %>).
+ * Generated — do not edit.
+ *
+ * `<%= e.className %>` mirrors a full persisted row (all columns, including the primary key and any
+ * managed timestamps). `createSchema` validates create payloads and requires every writable field;
+ * `updateSchema` is its partial variant for PATCH/PUT (all fields optional).
+ */
+
+/** A full <%= e.name %> record as returned by the API (camelCase, decoded to native TS types). */
+export interface <%= e.className %> {
+<% for (const c of e.columns) { -%>
+  <%= c.field %><%= c.nullable ? "?" : "" %>: <%= c.tsType %><%= c.nullable ? " | null" : "" %>;
+<% } -%>
+}
+
+// Writable fields only — the primary key and managed timestamps are excluded because the
+// database/model assigns them.
+export const createSchema = z.object({
+<% for (const c of e.writable) { -%>
+  <%= c.field %>: <%- c.zod %><%= c.nullable ? ".optional()" : "" %>,
+<% } -%>
+});
+
+// Every field becomes optional for partial updates.
+export const updateSchema = createSchema.partial();
+
+export type CreateInput = z.infer<typeof createSchema>;
+export type UpdateInput = z.infer<typeof updateSchema>;

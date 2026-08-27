@@ -38,6 +38,31 @@ export const BLUEPRINT_JSON_SCHEMA = {
         dialect: { enum: ["sqlite", "mysql"] },
       },
     },
+    frontend: {
+      type: "object",
+      required: ["framework", "displayName", "detected"],
+      properties: {
+        framework: {
+          enum: [
+            "react",
+            "next",
+            "vue",
+            "nuxt",
+            "angular",
+            "svelte",
+            "sveltekit",
+            "solid",
+            "preact",
+            "unknown",
+          ],
+        },
+        displayName: { type: "string" },
+        version: { type: "string" },
+        meta: { type: "string" },
+        detected: { type: "boolean" },
+        sourceRefs: { type: "array", items: { $ref: "#/definitions/sourceRef" } },
+      },
+    },
     notes: { type: "array", items: { type: "string" } },
   },
   definitions: {

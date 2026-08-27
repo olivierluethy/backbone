@@ -1,0 +1,40 @@
+<?php
+
+/**
+ * Core application config — YOURS to extend (written once, never overwritten).
+ *
+ * A lean subset of Laravel's default config/app.php: enough for the generated API to boot,
+ * encrypt/sign (APP_KEY), and localise. Values are read from the environment so the same code
+ * runs in every environment.
+ */
+
+return [
+    // Human-readable application name (used in notifications, etc.).
+    'name' => env('APP_NAME', 'Backbone'),
+
+    // Current environment: "local", "production", … Drives framework behaviour.
+    'env' => env('APP_ENV', 'production'),
+
+    // When true, detailed error pages are shown. Keep false in production.
+    'debug' => (bool) env('APP_DEBUG', false),
+
+    // Base URL used by the console and for generating absolute links.
+    'url' => env('APP_URL', 'http://localhost'),
+
+    // Default timezone and locale for dates and translations.
+    'timezone' => 'UTC',
+    'locale' => 'en',
+    'fallback_locale' => 'en',
+    'faker_locale' => 'en_US',
+
+    // Encryption/signing. `php artisan key:generate` populates APP_KEY.
+    'cipher' => 'AES-256-CBC',
+    'key' => env('APP_KEY'),
+    'previous_keys' => [],
+
+    // Maintenance-mode driver.
+    'maintenance' => [
+        'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
+        'store' => env('APP_MAINTENANCE_STORE', 'database'),
+    ],
+];

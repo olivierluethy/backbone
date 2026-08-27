@@ -127,6 +127,38 @@ export interface BlueprintMeta {
   analyzer?: string;
 }
 
+/**
+ * The frontend UI framework the analyzer identified from the source project. Detection is
+ * deterministic (package.json dependencies + source-file signals) — when nothing conclusive
+ * is found `framework` is "unknown" and `detected` is false. Never guessed.
+ */
+export type FrontendFramework =
+  | "react"
+  | "next"
+  | "vue"
+  | "nuxt"
+  | "angular"
+  | "svelte"
+  | "sveltekit"
+  | "solid"
+  | "preact"
+  | "unknown";
+
+export interface FrontendInfo {
+  /** Canonical framework id, or "unknown" when detection was inconclusive. */
+  framework: FrontendFramework;
+  /** Human label, e.g. "React", "Next.js", "Vue". "Undetected" when unknown. */
+  displayName: string;
+  /** Semver-ish version string when readable from package.json, else undefined. */
+  version?: string;
+  /** Secondary signal, e.g. build tool ("Vite") or language ("TypeScript"). */
+  meta?: string;
+  /** True iff a concrete framework was identified. */
+  detected: boolean;
+  /** Where the detection signal came from (package.json line, source file). */
+  sourceRefs: SourceRef[];
+}
+
 export interface Blueprint {
   version: typeof BLUEPRINT_VERSION;
   meta: BlueprintMeta;
@@ -134,22 +166,55 @@ export interface Blueprint {
   endpoints: Endpoint[];
   auth: AuthConfig;
   datastore: Datastore;
+  /** The detected frontend UI framework, if analysis surfaced one. */
+  frontend?: FrontendInfo;
   /** Non-fatal notes surfaced during analysis (ambiguities, skipped nodes). */
   notes: string[];
 }
 
-/** Target runtime for generation. */
+/** Target backend runtime for generation. */
 export type Runtime = "node" | "php" | "python";
 
 /**
- * Architecture / framework preset. For Node this is a code layout (layered / modular); for
- * Python it selects the web framework (fastapi / django). The runtime × architecture pair
- * resolves to exactly one template set.
+ * Backend web framework. This is the FIRST of two orthogonal generation axes (the second is
+ * {@link Architecture}). Each framework belongs to exactly one runtime; the valid frameworks
+ * per runtime and the valid architectures per framework live in `capabilities.ts`.
  */
-export type Architecture = "layered" | "modular" | "fastapi" | "django";
+export type Framework =
+  // node
+  | "express"
+  | "nestjs"
+  | "fastify"
+  // php
+  | "laravel"
+  | "symfony"
+  | "php-plain"
+  // python
+  | "django"
+  | "fastapi"
+  | "flask";
+
+/**
+ * Architectural pattern — the SECOND generation axis, independent of the framework. It shapes
+ * the generated project's structure, layering and dependency direction (where models,
+ * use-cases and controllers live), not just cosmetics. Not every architecture is idiomatic for
+ * every framework; the allowed (framework × architecture) combinations come from the capability
+ * matrix in `capabilities.ts`.
+ */
+export type Architecture =
+  | "layered"
+  | "clean"
+  | "onion"
+  | "monolithic"
+  | "mvc"
+  | "mvvm"
+  | "microservices";
 
 export interface GenerateOptions {
   runtime: Runtime;
+  /** Backend web framework (must belong to `runtime`). */
+  framework: Framework;
+  /** Architectural pattern (must be valid for `framework` per the capability matrix). */
   architecture: Architecture;
   /** Output directory (absolute). */
   outDir: string;

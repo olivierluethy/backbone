@@ -1,0 +1,38 @@
+<% const lines = lv.entityMigrationLines(e); -%>
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Migration: create the `<%= e.table %>` table for the <%= e.name %> entity.
+ *
+ * Columns (from the Blueprint):
+<% for (const c of e.columns) { -%>
+ *   - <%= c.name %> : <%= c.type %><%= c.primaryKey ? " (primary key)" : "" %><%= c.fkTo ? ` (FK -> ${c.fkTable})` : "" %><%= c.nullable ? " (nullable)" : "" %>
+<% } -%>
+ *
+ * OWNED by Backbone — regenerated on every run; do not hand-edit. Uses Laravel 11's anonymous
+ * migration class style.
+ */
+return new class extends Migration
+{
+    /** Create the `<%= e.table %>` table. */
+    public function up(): void
+    {
+        Schema::create('<%= e.table %>', function (Blueprint $table): void {
+<% for (const line of lines) { -%>
+            <%- line %>
+<% } -%>
+        });
+    }
+
+    /** Drop the `<%= e.table %>` table. */
+    public function down(): void
+    {
+        Schema::dropIfExists('<%= e.table %>');
+    }
+};

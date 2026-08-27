@@ -1,0 +1,67 @@
+<% const idType = e.pkType === "uuid" ? "string" : "number";
+   const needsInt = e.pkType !== "uuid";
+   const httpDecos = new Set();
+   let needsParam = false, needsBody = false, needsGuard = false, needsParseInt = false;
+   for (const ep of e.endpoints) {
+     httpDecos.add(nest.methodDecorator(ep.method));
+     if (ep.auth) needsGuard = true;
+     if (ep.handler === "show" || ep.handler === "update" || ep.handler === "destroy") { needsParam = true; if (needsInt) needsParseInt = true; }
+     if (ep.handler === "store" || ep.handler === "update") needsBody = true;
+   }
+   const nestCommon = ["Controller", ...[...httpDecos].sort()];
+   if (needsParam) nestCommon.push("Param");
+   if (needsBody) nestCommon.push("Body");
+   if (needsParseInt) nestCommon.push("ParseIntPipe");
+   if (needsGuard) nestCommon.push("UseGuards"); -%>
+import { <%= nestCommon.join(", ") %> } from "@nestjs/common";
+import { <%= e.className %>Service } from "./<%= e.varName %>.service";
+<% if (needsBody) { -%>
+import { Create<%= e.className %>Dto } from "./dto/create-<%= e.varName %>.dto";
+import { Update<%= e.className %>Dto } from "./dto/update-<%= e.varName %>.dto";
+<% } -%>
+<% if (needsGuard) { -%>
+import { JwtGuard } from "../auth/jwt.guard";
+<% } -%>
+
+/**
+ * HTTP controller for <%= e.name %>, mounted at `<%= e.routeBase %>`. Backbone owns this file — do not edit.
+ * Each handler delegates to <%= e.className %>Service.<% if (needsGuard) { %> Endpoints marked auth in the Blueprint are
+ * protected by @UseGuards(JwtGuard), which rejects requests without a valid bearer token.<% } %>
+ */
+@Controller("<%= e.table %>")
+export class <%= e.className %>Controller {
+  constructor(private readonly service: <%= e.className %>Service) {}
+<% for (const ep of e.endpoints) {
+     const deco = nest.methodDecorator(ep.method);
+     const path = nest.methodPath(ep.httpPath, e.routeBase);
+     const method = nest.handlerMethod(ep.handler);
+     const idArg = needsInt ? '@Param("id", ParseIntPipe) id: number' : '@Param("id") id: string'; -%>
+
+  // <%= ep.method %> <%= ep.httpPath %> — <%= ep.operation %> <%= e.name %><%= ep.auth ? " (auth required)" : "" %>
+<% if (ep.auth) { -%>
+  @UseGuards(JwtGuard)
+<% } -%>
+  @<%= deco %>(<%- path ? JSON.stringify(path) : "" %>)
+<% if (ep.handler === "index") { -%>
+  <%= method %>() {
+    return this.service.findAll();
+  }
+<% } else if (ep.handler === "show") { -%>
+  <%= method %>(<%- idArg %>) {
+    return this.service.findOne(id);
+  }
+<% } else if (ep.handler === "store") { -%>
+  <%= method %>(@Body() dto: Create<%= e.className %>Dto) {
+    return this.service.create(dto);
+  }
+<% } else if (ep.handler === "update") { -%>
+  <%= method %>(<%- idArg %>, @Body() dto: Update<%= e.className %>Dto) {
+    return this.service.update(id, dto);
+  }
+<% } else if (ep.handler === "destroy") { -%>
+  <%= method %>(<%- idArg %>) {
+    return this.service.remove(id);
+  }
+<% } -%>
+<% } -%>
+}

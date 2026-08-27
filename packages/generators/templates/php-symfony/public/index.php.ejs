@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Front controller — the single HTTP entry point. This file is YOURS: Backbone writes it once
+ * and never overwrites it. `symfony/runtime` turns the returned closure into a booted Kernel and
+ * handles the Request/Response lifecycle. The generated API lives under `src/Generated/`.
+ */
+
+use App\Kernel;
+
+require_once dirname(__DIR__) . '/vendor/autoload_runtime.php';
+
+return static function (array $context): Kernel {
+    return new Kernel($context['APP_ENV'], (bool) $context['APP_DEBUG']);
+};

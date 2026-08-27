@@ -6,14 +6,16 @@ import {
   type Architecture,
   type Blueprint,
   type BlueprintDiff,
+  type Framework,
   type GenerateOptions,
   type Runtime,
 } from "@backbone/core";
 import { buildBlueprintView } from "./helpers.js";
+import { resolveLayout } from "./layout.js";
 import { writeFiles, type WriteReport } from "./render.js";
 import { readLock, writeLock } from "./lock.js";
 import { planMigration } from "./migrations.js";
-import { buildReport } from "./report.js";
+import { buildArchitectureDoc, buildReport } from "./report.js";
 import type { GenContext, Preset } from "./types.js";
 import { getPreset, listPresets } from "./presets/index.js";
 
@@ -42,9 +44,10 @@ export function generateBackend(
 ): GenerateResult {
   const blueprint = canonicalizeBlueprint(blueprintInput);
   const dialect = options.dialect ?? blueprint.datastore.dialect;
-  const preset = getPreset(options.runtime, options.architecture);
+  const preset = getPreset(options.runtime, options.framework, options.architecture);
   const view = buildBlueprintView(blueprint, dialect);
-  const ctx: GenContext = { blueprint, view, options: { ...options, dialect } };
+  const layout = resolveLayout(options.architecture);
+  const ctx: GenContext = { blueprint, view, options: { ...options, dialect }, layout };
 
   mkdirSync(options.outDir, { recursive: true });
 
@@ -82,7 +85,9 @@ export function generateBackend(
     view,
     presetId: preset.id,
     runtime: options.runtime,
+    framework: options.framework,
     architecture: options.architecture,
+    layout,
     files,
     migrationFilename,
     plan,
@@ -90,6 +95,15 @@ export function generateBackend(
     timestamp,
   });
   writeFileSync(join(options.outDir, "GENERATION_REPORT.md"), report);
+
+  // A per-project architecture reference, so the chosen pattern's layering is documented in-repo.
+  const archDoc = buildArchitectureDoc({
+    framework: options.framework,
+    architecture: options.architecture,
+    layout,
+  });
+  mkdirSync(join(options.outDir, "docs"), { recursive: true });
+  writeFileSync(join(options.outDir, "docs", "ARCHITECTURE.md"), archDoc);
 
   return {
     outDir: options.outDir,
@@ -110,4 +124,4 @@ function countMigrations(outDir: string): number {
 }
 
 export { getPreset, listPresets };
-export type { Preset, Runtime, Architecture };
+export type { Preset, Runtime, Framework, Architecture };

@@ -1,13 +1,24 @@
 import { useEffect, useState } from "react";
 import { marked } from "marked";
-import { summarizeDiff, type Blueprint, type BlueprintDiff } from "@backbone/core";
-import { api, type GenerateResult, type PresetInfo, type TargetStatus } from "../api";
+import {
+  type Architecture,
+  type Blueprint,
+  type BlueprintDiff,
+  type Framework,
+  type Runtime,
+} from "@backbone/core";
+import { api, type TargetStatus } from "../api";
 import { Button, Eyebrow } from "./primitives";
 import { StatusBadges } from "./StatusBadges";
 import { FileExplorer } from "./FileExplorer";
 import { StructureView } from "./StructureView";
+import { DatabaseView } from "./DatabaseView";
+import { ChangeSet } from "./ChangeSet";
+import { OpenInVscode } from "./OpenInVscode";
+import { useProject } from "../store/ProjectContext";
+import type { ResultTab } from "../store/persistence";
 
-/** A labelled segmented control. */
+/** A labelled segmented control. Options may be disabled with an explanatory tooltip. */
 function Segmented<T extends string>({
   label,
   value,
@@ -16,20 +27,25 @@ function Segmented<T extends string>({
 }: {
   label: string;
   value: T;
-  options: Array<{ value: T; label: string; disabled?: boolean }>;
+  options: Array<{ value: T; label: string; disabled?: boolean; title?: string; muted?: boolean }>;
   onChange: (v: T) => void;
 }) {
   return (
     <div>
       <div className="eyebrow mb-1.5">{label}</div>
-      <div className="inline-flex rounded-md border border-rule p-0.5">
+      <div className="inline-flex flex-wrap rounded-md border border-rule p-0.5">
         {options.map((o) => (
           <button
             key={o.value}
             disabled={o.disabled}
+            title={o.title}
             onClick={() => onChange(o.value)}
-            className={`rounded-sm px-3 py-1 text-small font-medium capitalize transition-colors disabled:opacity-30 ${
-              value === o.value ? "bg-ink-600 text-text" : "text-text-muted hover:text-text"
+            className={`rounded-sm px-3 py-1 text-small font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+              value === o.value
+                ? "bg-ink-600 text-text"
+                : o.muted
+                  ? "text-slate-300 hover:text-text"
+                  : "text-text-muted hover:text-text"
             }`}
           >
             {o.label}
@@ -40,61 +56,55 @@ function Segmented<T extends string>({
   );
 }
 
-type Tab = "report" | "files" | "structure";
-
 export function GeneratePanel({
   blueprint,
-  presets,
-  runtime,
-  architecture,
-  dialect,
-  setRuntime,
-  setArchitecture,
-  setDialect,
+  vscodeAvailable,
   onGenerate,
   generating,
-  result,
-  error,
 }: {
   blueprint: Blueprint;
-  presets: PresetInfo[];
-  runtime: string;
-  architecture: string;
-  dialect: string;
-  setRuntime: (v: string) => void;
-  setArchitecture: (v: string) => void;
-  setDialect: (v: string) => void;
+  vscodeAvailable: boolean;
   onGenerate: () => void;
   generating: boolean;
-  result: GenerateResult | null;
-  error: string | null;
 }) {
+  const {
+    caps,
+    runtime,
+    framework,
+    architecture,
+    dialect,
+    setRuntime,
+    setFramework,
+    setArchitecture,
+    setDialect,
+    result,
+    genError: error,
+    tab,
+    setTab,
+  } = useProject();
   const [status, setStatus] = useState<TargetStatus | null>(null);
-  const [tab, setTab] = useState<Tab>("report");
-
-  const runtimes = [...new Set(presets.map((p) => p.runtime))];
-  const archsForRuntime = presets.filter((p) => p.runtime === runtime).map((p) => p.architecture);
-  const isPython = runtime === "python";
-  const archLabel = isPython ? "Framework" : "Architecture";
+  const runtimes = caps?.runtimes ?? (["node", "php", "python"] as Runtime[]);
+  const frameworksForRuntime = caps?.frameworksByRuntime?.[runtime as Runtime] ?? [];
+  const fwCaps = caps?.frameworks?.[framework as Framework];
+  const archOptions = fwCaps?.architectures ?? [];
+  const archDescription = archOptions.find((a) => a.id === architecture)?.description;
+  // Selecting an unsupported architecture is blocked; unregistered ones are shown but disabled.
+  const selectedArch = archOptions.find((a) => a.id === architecture);
+  const canGenerate = !selectedArch || selectedArch.registered;
 
   // What mode would run right now (generate vs regenerate) at the resolved target?
   useEffect(() => {
     let alive = true;
     api
-      .targetStatus(runtime, architecture)
+      .targetStatus(runtime, framework, architecture)
       .then((s) => alive && setStatus(s))
       .catch(() => alive && setStatus(null));
     return () => {
       alive = false;
     };
-  }, [runtime, architecture, result]);
-
-  useEffect(() => {
-    if (result) setTab("report");
-  }, [result]);
+  }, [runtime, framework, architecture, result]);
 
   const willRegenerate = status?.mode === "regenerate";
-  const diffLines = result?.diff ? summarizeDiff(result.diff as BlueprintDiff) : [];
 
   return (
     <div>
@@ -111,25 +121,48 @@ export function GeneratePanel({
           label="Runtime"
           value={runtime}
           onChange={setRuntime}
-          options={runtimes.map((r) => ({ value: r, label: r }))}
+          options={runtimes.map((r) => ({ value: r, label: caps?.runtimeLabels?.[r as Runtime] ?? r }))}
         />
         <Segmented
-          label={archLabel}
+          label="Framework"
+          value={framework}
+          onChange={setFramework}
+          options={frameworksForRuntime.map((f) => ({
+            value: f,
+            label: caps?.frameworkLabels?.[f as Framework] ?? f,
+          }))}
+        />
+        <Segmented
+          label="Architecture"
           value={architecture}
           onChange={setArchitecture}
-          options={[...new Set(archsForRuntime)].map((a) => ({ value: a, label: a }))}
+          options={archOptions.map((a) => ({
+            value: a.id,
+            label: a.label + (a.isDefault ? " ★" : ""),
+            disabled: !a.supported || !a.registered,
+            muted: a.supported && !a.registered,
+            title: !a.supported
+              ? (a.reason ?? undefined)
+              : !a.registered
+                ? `${a.label} is a valid ${fwCaps?.label ?? framework} pattern but is not generatable in this build yet.`
+                : a.description,
+          }))}
         />
         <Segmented
           label="Datastore"
           value={dialect}
           onChange={setDialect}
           options={[
-            { value: "sqlite", label: "sqlite" },
-            { value: "mysql", label: "mysql" },
+            { value: "sqlite", label: "SQLite" },
+            { value: "mysql", label: "MySQL" },
           ]}
         />
         <div className="flex flex-col gap-1">
-          <Button variant={willRegenerate ? "primary" : "generate"} onClick={onGenerate} disabled={generating}>
+          <Button
+            variant={willRegenerate ? "primary" : "generate"}
+            onClick={onGenerate}
+            disabled={generating || !canGenerate}
+          >
             {generating
               ? willRegenerate
                 ? "Regenerating…"
@@ -141,7 +174,14 @@ export function GeneratePanel({
         </div>
       </div>
 
-      {status && (
+      {archDescription && (
+        <p className="mt-2 max-w-3xl text-small text-text-muted">
+          <span className="eyebrow mr-2 text-slate-300">{selectedArch?.label}</span>
+          {archDescription}
+        </p>
+      )}
+
+      {status && canGenerate && (
         <p className="mt-2 text-small text-text-muted">
           {willRegenerate ? (
             <>
@@ -157,6 +197,13 @@ export function GeneratePanel({
         </p>
       )}
 
+      {!canGenerate && (
+        <p className="mt-2 text-small text-warn-500">
+          {selectedArch?.label} is offered for {fwCaps?.label ?? framework} but not generatable in this
+          build yet — pick another architecture.
+        </p>
+      )}
+
       {error && (
         <div className="mt-4 rounded-md border border-danger-500/50 bg-danger-050 p-3 text-small text-danger-500">
           {error}
@@ -169,26 +216,23 @@ export function GeneratePanel({
             result={result}
             blueprint={blueprint}
             runtime={runtime}
-            architecture={architecture}
+            framework={caps?.frameworkLabels?.[framework as Framework] ?? framework}
+            architecture={caps?.architectureLabels?.[architecture as Architecture] ?? architecture}
             dialect={dialect}
           />
 
-          {diffLines.length > 0 && (
-            <div>
-              <Eyebrow count={diffLines.length}>Change set</Eyebrow>
-              <div className="mt-2 overflow-x-auto rounded-md border border-line bg-ink-800 p-3">
-                {diffLines.map((l, i) => (
-                  <div key={i} className={`mono whitespace-pre ${diffColor(l)}`}>
-                    {l}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <OpenInVscode dir={result.outDir} available={vscodeAvailable} label="Open project in VS Code" />
+            <span className="text-small text-text-muted">
+              or download the project from the <span className="text-text">Files</span> tab.
+            </span>
+          </div>
+
+          {result.diff ? <ChangeSet diff={result.diff as BlueprintDiff} /> : null}
 
           {/* Tabbed results */}
           <div className="flex gap-1 border-b border-line">
-            {(["report", "files", "structure"] as Tab[]).map((t) => (
+            {(["report", "files", "database", "structure"] as ResultTab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -207,17 +251,11 @@ export function GeneratePanel({
               dangerouslySetInnerHTML={{ __html: marked.parse(result.report) as string }}
             />
           )}
-          {tab === "files" && <FileExplorer dir={result.outDir} />}
+          {tab === "files" && <FileExplorer dir={result.outDir} vscodeAvailable={vscodeAvailable} />}
+          {tab === "database" && <DatabaseView blueprint={blueprint} />}
           {tab === "structure" && <StructureView blueprint={blueprint} dir={result.outDir} />}
         </div>
       )}
     </div>
   );
-}
-
-function diffColor(line: string): string {
-  if (line.startsWith("+")) return "text-verd-400";
-  if (line.startsWith("-")) return "text-danger-500";
-  if (line.startsWith("~")) return "text-brass-400";
-  return "text-text-muted";
 }

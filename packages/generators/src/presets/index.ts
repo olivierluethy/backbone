@@ -1,44 +1,86 @@
-import type { Architecture, Runtime } from "@backbone/core";
+import {
+  ARCHITECTURE_LABELS,
+  FRAMEWORK_LABELS,
+  type Architecture,
+  type Framework,
+  type Runtime,
+} from "@backbone/core";
 import type { Preset } from "../types.js";
-import { nodeLayeredPreset } from "./node-layered.js";
-import { nodeModularPreset } from "./node-modular.js";
-import { phpLayeredPreset } from "./php-layered.js";
-import { pythonFastapiPreset } from "./python-fastapi.js";
-import { pythonDjangoPreset } from "./python-django.js";
+import { nodeExpressPresets } from "./node-express.js";
+import { nodeNestPresets } from "./node-nest.js";
+import { nodeFastifyPresets } from "./node-fastify.js";
+import { phpPlainPresets } from "./php-plain.js";
+import { phpLaravelPresets } from "./php-laravel.js";
+import { phpSymfonyPresets } from "./php-symfony.js";
+import { pythonFastapiPresets } from "./python-fastapi.js";
+import { pythonDjangoPresets } from "./python-django.js";
+import { pythonFlaskPresets } from "./python-flask.js";
 
+/**
+ * The preset registry. Each framework module exports one or more `Preset`s — one per
+ * (framework × architecture) combination it supports. Resolution is an exact match on the
+ * (runtime, framework, architecture) triple. The set of *offered* combinations lives in the
+ * core capability matrix; a preset must exist here for a combination to actually generate.
+ */
 const PRESETS: Preset[] = [
-  nodeLayeredPreset,
-  nodeModularPreset,
-  phpLayeredPreset,
-  pythonFastapiPreset,
-  pythonDjangoPreset,
+  ...nodeExpressPresets,
+  ...nodeNestPresets,
+  ...nodeFastifyPresets,
+  ...phpPlainPresets,
+  ...phpLaravelPresets,
+  ...phpSymfonyPresets,
+  ...pythonFastapiPresets,
+  ...pythonDjangoPresets,
+  ...pythonFlaskPresets,
 ];
 
 export interface PresetInfo {
   id: string;
   runtime: Runtime;
+  framework: Framework;
   architecture: Architecture;
   label: string;
+}
+
+function labelFor(p: Preset): string {
+  return `${FRAMEWORK_LABELS[p.framework]} · ${ARCHITECTURE_LABELS[p.architecture]}`;
 }
 
 export function listPresets(): PresetInfo[] {
   return PRESETS.map((p) => ({
     id: p.id,
     runtime: p.runtime,
+    framework: p.framework,
     architecture: p.architecture,
-    label: `${p.runtime} · ${p.architecture}`,
+    label: labelFor(p),
   }));
 }
 
-/** Resolve a template set by runtime + architecture, throwing if the combo is unsupported. */
-export function getPreset(runtime: Runtime, architecture: Architecture): Preset {
-  const found = PRESETS.find((p) => p.runtime === runtime && p.architecture === architecture);
+/** True iff a template set is registered for this exact triple. */
+export function hasPreset(runtime: Runtime, framework: Framework, architecture: Architecture): boolean {
+  return PRESETS.some(
+    (p) => p.runtime === runtime && p.framework === framework && p.architecture === architecture,
+  );
+}
+
+/**
+ * Resolve a template set by (runtime, framework, architecture), throwing a precise error if the
+ * combination has no registered preset.
+ */
+export function getPreset(
+  runtime: Runtime,
+  framework: Framework,
+  architecture: Architecture,
+): Preset {
+  const found = PRESETS.find(
+    (p) => p.runtime === runtime && p.framework === framework && p.architecture === architecture,
+  );
   if (!found) {
     const supported = listPresets()
-      .map((p) => `${p.runtime}/${p.architecture}`)
+      .map((p) => `${p.runtime}/${p.framework}/${p.architecture}`)
       .join(", ");
     throw new Error(
-      `No template set for ${runtime}/${architecture}. Supported: ${supported}.`,
+      `No template set for ${runtime}/${framework}/${architecture}. Supported: ${supported}.`,
     );
   }
   return found;

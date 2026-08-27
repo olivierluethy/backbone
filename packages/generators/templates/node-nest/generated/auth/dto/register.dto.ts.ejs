@@ -1,0 +1,31 @@
+<% const extras = view.authUserExtraColumns;
+   const base = ["IsEmail", "IsString", "MinLength"];
+   const extraDecos = new Set();
+   if (extras.length) extraDecos.add("IsOptional");
+   for (const c of extras) { for (const d of nest.validators(c)) { if (!d.startsWith("@IsOptional")) extraDecos.add(d.replace(/^@/, "").replace(/\(.*$/, "")); } }
+   const imports = [...new Set([...base, ...extraDecos])].sort(); -%>
+import { <%= imports.join(", ") %> } from "class-validator";
+
+/**
+ * Registration DTO for POST /auth/register. Backbone owns this file — do not edit.
+ * Validated by the global ValidationPipe: a valid email and a password of at least 6 characters<% if (extras.length) { %>,
+ * plus optional profile fields folded in from the Blueprint's User entity (<%= extras.map((c) => c.name).join(", ") %>)<% } %>.
+ */
+export class RegisterDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(6)
+  password!: string;
+<% for (const c of extras) { -%>
+
+  @IsOptional()
+<% for (const d of nest.validators(c)) { -%>
+<% if (!d.startsWith("@IsOptional")) { -%>
+  <%- d %>
+<% } -%>
+<% } -%>
+  <%= c.field %>?: <%- c.tsType %>;
+<% } -%>
+}

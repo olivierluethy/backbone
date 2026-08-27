@@ -13,10 +13,11 @@ const G = "api/generated"; // the owned boundary
  * Migrations are Django's own: models are generated deterministically and the developer runs
  * `manage.py makemigrations && migrate` (idiomatic). So `migration()` returns null.
  */
-export const pythonDjangoPreset: Preset = {
-  id: "python-django",
+const djangoMvc: Preset = {
+  id: "django-mvc",
   runtime: "python",
-  architecture: "django",
+  framework: "django",
+  architecture: "mvc",
   templateDir: DIR,
 
   build(ctx: GenContext): GenFile[] {
@@ -63,6 +64,8 @@ export const pythonDjangoPreset: Preset = {
     return null;
   },
 };
+
+export const pythonDjangoPresets: Preset[] = [djangoMvc];
 
 /* Deterministic Django model-field fragments, passed into templates as `dj`. */
 export const dj = {

@@ -1,0 +1,30 @@
+<?php
+
+/**
+ * HTTP entry point — YOURS to keep (written once, never overwritten).
+ *
+ * Every web request is routed here by the server. It boots Laravel from bootstrap/app.php and
+ * hands the captured request to the HTTP kernel, which dispatches it through the generated
+ * routes in routes/api.php. This is the standard Laravel 11 front controller.
+ */
+
+use Illuminate\Http\Request;
+
+define('LARAVEL_START', microtime(true));
+
+// Serve any static file that already exists (parity with `php artisan serve`).
+if (php_sapi_name() === 'cli-server') {
+    $file = __DIR__ . '/' . ltrim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+    if ($file !== __DIR__ . '/' && is_file($file)) {
+        return false;
+    }
+}
+
+// Autoload Composer dependencies (Laravel framework + this app's App\ namespace).
+require __DIR__ . '/../vendor/autoload.php';
+
+// Bootstrap Laravel and handle the incoming request.
+/** @var \Illuminate\Foundation\Application $app */
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+
+$app->handleRequest(Request::capture());

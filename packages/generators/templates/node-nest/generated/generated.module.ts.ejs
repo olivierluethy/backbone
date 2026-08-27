@@ -1,0 +1,47 @@
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+<% for (const e of view.entities) { -%>
+import { <%= e.className %>Module } from "./<%= e.varName %>/<%= e.varName %>.module";
+<% } -%>
+<% if (auth) { -%>
+import { AuthModule } from "./auth/auth.module";
+<% } -%>
+
+/**
+ * The generated root module. Backbone owns this file — it is regenerated wholesale, so do not
+ * edit it. It configures the TypeORM DataSource and aggregates every generated feature module:
+ * <%= view.entities.map((e) => e.name).join(", ") || "(no entities)" %><% if (auth) { %>, and the authentication module<% } %>.
+ */
+@Module({
+  imports: [
+    // --- TypeORM DataSource ---------------------------------------------------------------
+    // `synchronize: true` derives the schema directly from the @Entity metadata on boot, so the
+    // <%= view.dialect === "sqlite" ? "SQLite" : "MySQL" %> tables are created automatically in development. `autoLoadEntities` registers every
+    // entity declared via TypeOrmModule.forFeature() in the feature modules below.
+    // NOTE: switch synchronize to false and use TypeORM migrations for production (see README).
+    TypeOrmModule.forRoot(<% if (view.dialect !== "sqlite") { %>{
+      type: "mysql",
+      host: process.env.DB_HOST ?? "127.0.0.1",
+      port: Number(process.env.DB_PORT ?? 3306),
+      username: process.env.DB_USER ?? "root",
+      password: process.env.DB_PASSWORD ?? "",
+      database: process.env.DB_NAME ?? "backbone",
+      autoLoadEntities: true,
+      synchronize: true,
+    }<% } else { %>{
+      type: "better-sqlite3",
+      database: process.env.DB_FILE ?? "./data.sqlite",
+      autoLoadEntities: true,
+      synchronize: true,
+    }<% } %>),
+
+    // --- Feature modules ------------------------------------------------------------------
+<% if (auth) { -%>
+    AuthModule,
+<% } -%>
+<% for (const e of view.entities) { -%>
+    <%= e.className %>Module,
+<% } -%>
+  ],
+})
+export class GeneratedModule {}

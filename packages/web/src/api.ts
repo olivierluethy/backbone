@@ -1,12 +1,45 @@
-import type { Blueprint } from "@backbone/core";
+import type { Architecture, Blueprint, Framework, Runtime } from "@backbone/core";
 
 /** Client for the pipeline server. Every call is a deterministic pipeline step. */
 
 export interface PresetInfo {
   id: string;
   runtime: string;
+  framework: string;
   architecture: string;
   label: string;
+}
+
+/** One architecture option for a framework, as served by the capability matrix. */
+export interface ArchOption {
+  id: Architecture;
+  label: string;
+  description: string;
+  supported: boolean;
+  registered: boolean;
+  isDefault: boolean;
+  reason: string | null;
+}
+
+export interface FrameworkCaps {
+  label: string;
+  runtime: Runtime;
+  defaultArchitecture: Architecture;
+  architectures: ArchOption[];
+}
+
+export interface Capabilities {
+  runtimes: Runtime[];
+  runtimeLabels: Record<Runtime, string>;
+  frameworksByRuntime: Record<Runtime, Framework[]>;
+  frameworkLabels: Record<Framework, string>;
+  architectureLabels: Record<Architecture, string>;
+  architectureDescriptions: Record<Architecture, string>;
+  architecturesByFramework: Record<Framework, Architecture[]>;
+  defaultArchitecture: Record<Framework, Architecture>;
+  runtimeOfFramework: Record<Framework, Runtime>;
+  defaultFrameworkByRuntime: Record<Runtime, Framework>;
+  frameworks: Record<Framework, FrameworkCaps>;
 }
 
 export interface Meta {
@@ -14,6 +47,8 @@ export interface Meta {
   home: string;
   demoPath: string;
   presets: PresetInfo[];
+  capabilities: Capabilities;
+  vscode: boolean;
 }
 
 export interface GenerateResult {
@@ -124,17 +159,20 @@ export const api = {
     get<FsListing>(`/api/fs/list${path ? `?path=${encodeURIComponent(path)}` : ""}`),
   analyze: (frontendPath: string) =>
     post<{ blueprint: Blueprint }>("/api/analyze", { frontendPath }),
-  targetStatus: (runtime: string, architecture: string) =>
+  targetStatus: (runtime: string, framework: string, architecture: string) =>
     get<TargetStatus>(
-      `/api/target-status?runtime=${encodeURIComponent(runtime)}&architecture=${encodeURIComponent(architecture)}`,
+      `/api/target-status?runtime=${encodeURIComponent(runtime)}&framework=${encodeURIComponent(framework)}&architecture=${encodeURIComponent(architecture)}`,
     ),
   generate: (args: {
     blueprint: Blueprint;
     runtime: string;
+    framework: string;
     architecture: string;
     dialect: string;
     outDir?: string;
   }) => post<GenerateResult>("/api/generate", args),
+  openVscode: (dir: string, path?: string) =>
+    post<{ opened: boolean; deepLink: string; hint?: string }>("/api/open-vscode", { dir, path }),
   source: (root: string, file: string, line: number) =>
     post<SourceSnippet>("/api/source", { root, file, line }),
   generatedTree: (dir: string) =>

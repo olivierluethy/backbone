@@ -1,0 +1,8 @@
+# Routing. This file is YOURS (written once). It scans the generated controllers for `#[Route]`
+# attributes so every CRUD<% if (auth) { %> and auth<% } %> endpoint is wired automatically. Add your own
+# route files or imports below.
+generated_controllers:
+    resource:
+        path: '../src/Generated/Controller/'
+        namespace: App\Generated\Controller
+    type: attribute

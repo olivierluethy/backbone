@@ -1,129 +1,44 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  serializeBlueprint,
-  validateBlueprint,
-  type Blueprint,
-} from "@backbone/core";
-import { api, type GenerateResult, type Meta } from "./api";
-import { Rail, type Stage } from "./components/Rail";
+import { useState } from "react";
+import type { Blueprint } from "@backbone/core";
+import { Rail } from "./components/Rail";
 import { BlueprintCanvas } from "./components/BlueprintCanvas";
 import { AuthSummary, EndpointsTable } from "./components/EndpointsTable";
 import { GeneratePanel } from "./components/GeneratePanel";
 import { FolderPicker } from "./components/FolderPicker";
+import { FrontendBadge } from "./components/FrontendBadge";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { Button, Eyebrow } from "./components/primitives";
+import { useProject } from "./store/ProjectContext";
 
 export default function App() {
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [frontendPath, setFrontendPath] = useState("examples/demo-frontend");
-  const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
-  const [excluded, setExcluded] = useState<Set<string>>(new Set());
-  const [stage, setStage] = useState<Stage>("analyze");
+  const {
+    meta,
+    frontendPath,
+    setFrontendPath,
+    blueprint,
+    excluded,
+    stage,
+    setStage,
+    analyzing,
+    analyzeError,
+    generating,
+    result,
+    outgoing,
+    issues,
+    reached,
+    root,
+    hasProjectData,
+    analyze,
+    generate,
+    download,
+    toggleEntity,
+    toggleEndpoint,
+    toggleField,
+    clearProject,
+  } = useProject();
 
-  const [runtime, setRuntimeState] = useState("node");
-  const [architecture, setArchitecture] = useState("layered");
-  const [dialect, setDialect] = useState("sqlite");
   const [pickerOpen, setPickerOpen] = useState(false);
-
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
-  const [result, setResult] = useState<GenerateResult | null>(null);
-
-  useEffect(() => {
-    api.meta().then(setMeta).catch(() => setMeta(null));
-  }, []);
-
-  const reached: Record<Stage, boolean> = {
-    analyze: true,
-    blueprint: !!blueprint,
-    generate: !!blueprint,
-    regenerate: !!result,
-  };
-
-  async function analyze() {
-    setAnalyzing(true);
-    setAnalyzeError(null);
-    try {
-      const { blueprint: bp } = await api.analyze(frontendPath);
-      setBlueprint(bp);
-      setExcluded(new Set());
-      setResult(null);
-      setStage("blueprint");
-    } catch (e) {
-      setAnalyzeError((e as Error).message);
-    } finally {
-      setAnalyzing(false);
-    }
-  }
-
-  function toggleEntity(name: string, on: boolean) {
-    setBlueprint((bp) =>
-      bp ? { ...bp, entities: bp.entities.map((e) => (e.name === name ? { ...e, generate: on } : e)) } : bp,
-    );
-  }
-  function toggleEndpoint(index: number, on: boolean) {
-    setBlueprint((bp) =>
-      bp ? { ...bp, endpoints: bp.endpoints.map((ep, i) => (i === index ? { ...ep, generate: on } : ep)) } : bp,
-    );
-  }
-  function toggleField(key: string, on: boolean) {
-    setExcluded((prev) => {
-      const next = new Set(prev);
-      if (on) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  /** Switch runtime and reconcile the architecture/framework to one that runtime supports. */
-  function setRuntime(next: string) {
-    setRuntimeState(next);
-    const archs = (meta?.presets ?? []).filter((p) => p.runtime === next).map((p) => p.architecture);
-    if (archs.length && !archs.includes(architecture)) setArchitecture(archs[0]);
-  }
-
-  /** The blueprint actually sent to the generator: excluded fields stripped. */
-  const outgoing = useMemo<Blueprint | null>(() => {
-    if (!blueprint) return null;
-    return {
-      ...blueprint,
-      entities: blueprint.entities.map((e) => ({
-        ...e,
-        fields: e.fields.filter((f) => !excluded.has(`${e.name}.${f.name}`)),
-      })),
-    };
-  }, [blueprint, excluded]);
-
-  const issues = useMemo(() => (outgoing ? validateBlueprint(outgoing) : []), [outgoing]);
-
-  async function generate() {
-    if (!outgoing) return;
-    setGenerating(true);
-    setGenError(null);
-    try {
-      const res = await api.generate({ blueprint: outgoing, runtime, architecture, dialect });
-      setResult(res);
-      setStage(res.diff ? "regenerate" : "generate");
-    } catch (e) {
-      setGenError((e as Error).message);
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  function download() {
-    if (!outgoing) return;
-    const blob = new Blob([serializeBlueprint(outgoing)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "blueprint.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  const root = blueprint?.meta.frontendPath ?? frontendPath;
+  const [confirmClear, setConfirmClear] = useState(false);
 
   return (
     <div className="flex h-full max-[820px]:flex-col">
@@ -163,6 +78,11 @@ export default function App() {
               </Button>
             </>
           )}
+          {hasProjectData && (
+            <Button variant="danger" onClick={() => setConfirmClear(true)} title="Remove this project's saved state">
+              Clear project data
+            </Button>
+          )}
         </header>
 
         <main className="min-w-0 flex-1 overflow-auto px-6 py-6">
@@ -178,6 +98,7 @@ export default function App() {
 
           {blueprint && stage === "blueprint" && (
             <div className="space-y-8">
+              <FrontendBadge frontend={blueprint.frontend} />
               {issues.length > 0 && (
                 <div className="rounded-md border border-danger-500/50 bg-danger-050 p-3 text-small text-danger-500">
                   {issues.length} validation issue(s): {issues.map((i) => `${i.path}: ${i.message}`).join("; ")}
@@ -198,17 +119,9 @@ export default function App() {
           {blueprint && (stage === "generate" || stage === "regenerate") && (
             <GeneratePanel
               blueprint={outgoing ?? blueprint}
-              presets={meta?.presets ?? []}
-              runtime={runtime}
-              architecture={architecture}
-              dialect={dialect}
-              setRuntime={setRuntime}
-              setArchitecture={setArchitecture}
-              setDialect={setDialect}
+              vscodeAvailable={!!meta?.vscode}
               onGenerate={generate}
               generating={generating}
-              result={result}
-              error={genError}
             />
           )}
         </main>
@@ -222,6 +135,19 @@ export default function App() {
           setPickerOpen(false);
         }}
         onClose={() => setPickerOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="Clear project data"
+        message="This removes the saved state for this project from your browser. Generated files on disk are not touched. This cannot be undone."
+        bullets={["Blueprint", "Endpoints", "Database schema", "Directory / structure", "Change set"]}
+        confirmLabel="Clear project data"
+        onConfirm={() => {
+          clearProject();
+          setConfirmClear(false);
+        }}
+        onClose={() => setConfirmClear(false)}
       />
     </div>
   );
@@ -261,6 +187,7 @@ function Summary({ blueprint }: { blueprint: Blueprint }) {
   return (
     <div className="space-y-4">
       <Eyebrow>Analysis</Eyebrow>
+      <FrontendBadge frontend={blueprint.frontend} />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           ["Entities", blueprint.entities.length],

@@ -17,10 +17,11 @@ const G = "app/generated"; // the owned boundary
  * lives under `app/generated/` (owned); a thin `app/main.py` outside it is written once.
  * camelCase JSON API over snake_case columns via Pydantic aliases. Deterministic, no AI.
  */
-export const pythonFastapiPreset: Preset = {
-  id: "python-fastapi",
+const fastapiLayered: Preset = {
+  id: "fastapi-layered",
   runtime: "python",
-  architecture: "fastapi",
+  framework: "fastapi",
+  architecture: "layered",
   templateDir: DIR,
   migrationExtension: "py",
 
@@ -97,6 +98,8 @@ export const pythonFastapiPreset: Preset = {
     };
   },
 };
+
+export const pythonFastapiPresets: Preset[] = [fastapiLayered];
 
 /* ------------------------------------------------------------------ *
  * Deterministic Python/SQLAlchemy/Alembic code fragments — computed

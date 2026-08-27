@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * Application bootstrap — YOURS to extend (written once, never overwritten).
+ *
+ * Laravel 11 configures the whole application from this single file. We register the generated
+ * API routes (routes/api.php, which Laravel prefixes with `/api`), the console routes, and a
+ * `/up` health check. Add global middleware or custom exception rendering in the closures below.
+ */
+
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        // The generated REST API. Backbone owns this file and keeps it in sync with the Blueprint.
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
+        health: '/up',
+    )
+    ->withMiddleware(function (Middleware $middleware): void {
+        // Register your global / route middleware here.
+    })
+    ->withExceptions(function (Exceptions $exceptions): void {
+        // Customise how exceptions are reported and rendered here.
+    })
+    ->create();

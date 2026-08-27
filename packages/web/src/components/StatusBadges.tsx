@@ -24,12 +24,14 @@ export function StatusBadges({
   result,
   blueprint,
   runtime,
+  framework,
   architecture,
   dialect,
 }: {
   result: GenerateResult;
   blueprint: Blueprint;
   runtime: string;
+  framework: string;
   architecture: string;
   dialect: string;
 }) {
@@ -38,8 +40,6 @@ export function StatusBadges({
   const activeEntities = blueprint.entities.filter((e) => e.generate).length;
   const activeEndpoints = blueprint.endpoints.filter((e) => e.generate).length;
   const isRegen = result.mode === "regenerate";
-  const frameworkLabel = runtime === "python" ? `${runtime} · ${architecture}` : runtime;
-  const archLabel = runtime === "python" ? "framework" : "architecture";
 
   return (
     <div className="rounded-md border border-verd-500/40 bg-verd-050 p-4">
@@ -57,8 +57,9 @@ export function StatusBadges({
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         <Badge label="Mode" value={isRegen ? "Regenerate" : "Generate"} tone={isRegen ? "brass" : "verd"} />
-        <Badge label="Runtime" value={frameworkLabel} tone="text" />
-        <Badge label={archLabel} value={architecture} tone="text" />
+        <Badge label="Runtime" value={runtime} tone="text" />
+        <Badge label="Framework" value={framework} tone="text" />
+        <Badge label="Architecture" value={architecture} tone="text" />
         <Badge label="Datastore" value={dialect} tone="text" />
         <Badge label="Auth" value={blueprint.auth.required ? "JWT" : "none"} tone={blueprint.auth.required ? "brass" : "muted"} />
         <Badge label="Entities" value={String(activeEntities)} tone="text" />
@@ -80,15 +81,21 @@ export function StatusBadges({
   );
 }
 
-/** Locale-formatted "27 Aug 2026, 18:14" with graceful fallback. */
+/**
+ * English-locale "27 Aug 2026, 10:41 PM" (never the host locale, which leaked non-English strings
+ * like "27 ago 2026, 10:41 p.m."). The raw ISO is kept in the badge `title`.
+ */
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return d
+    .toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .replace(/\b(am|pm)\b/i, (m) => m.toUpperCase());
 }

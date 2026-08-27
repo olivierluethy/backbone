@@ -1,0 +1,20 @@
+# Core framework configuration. This file is YOURS (written once). It enables just what the
+# generated JSON API needs: the serializer (used by AbstractController::json), property_info,
+# and sane HTTP defaults. Add sessions, CSRF, mailer, etc. here as your app grows.
+framework:
+    secret: '%env(APP_SECRET)%'
+    http_method_override: false
+    handle_all_throwables: true
+
+    # AbstractController::json() renders entities through the Symfony serializer.
+    serializer:
+        enabled: true
+
+    property_info:
+        enabled: true
+
+    router:
+        utf8: true
+
+    php_errors:
+        log: true

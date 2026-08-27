@@ -1,0 +1,30 @@
+import "reflect-metadata";
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { AppModule } from "./app.module";
+
+/**
+ * Application entry point. This file is YOURS — Backbone writes it once and never touches it
+ * again. It boots the Nest application, enables global request validation and CORS, and starts
+ * the HTTP server. The generated API lives under `src/generated/` and is mounted via AppModule.
+ */
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule);
+
+  // Global validation: every incoming body is checked against the class-validator decorators on
+  // the DTOs. `whitelist` strips unknown properties; `transform` coerces payloads into DTO
+  // instances (and route params into their declared types).
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, transform: true }),
+  );
+
+  // Allow browser clients (the generating frontend) to call this API cross-origin.
+  app.enableCors();
+
+  const port = Number(process.env.PORT ?? 4000);
+  await app.listen(port);
+  // eslint-disable-next-line no-console
+  console.log(`Backbone NestJS backend listening on http://localhost:${port}`);
+}
+
+void bootstrap();

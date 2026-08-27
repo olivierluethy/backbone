@@ -1,0 +1,18 @@
+<% const needsAuth = e.endpoints.some((ep) => ep.auth); -%>
+import type { FastifyInstance } from "fastify";
+import { <%= e.className %>Controller } from "../controllers/<%= e.varName %>.controller";
+
+/**
+ * Fastify plugin exposing the HTTP endpoints for <%= e.name %> (table `<%= e.table %>`).
+ * Generated — do not edit. Registered by routes/index.ts.
+<% if (needsAuth) { -%>
+ * Protected endpoints attach the `authenticate` preHandler (provided by the auth plugin) so a
+ * valid Bearer JWT is required before the handler runs.
+<% } -%>
+ */
+export async function <%= e.varName %>Routes(fastify: FastifyInstance): Promise<void> {
+<% for (const ep of e.endpoints) { -%>
+  // <%= ep.method %> <%= ep.httpPath %> — <%= ep.operation %> <%= e.name %><%= ep.auth ? " (auth required)" : "" %>
+  fastify.<%= ep.method.toLowerCase() %>(<%- JSON.stringify(ep.httpPath) %>, <% if (ep.auth) { %>{ preHandler: [fastify.authenticate] }, <% } %><%= e.className %>Controller.<%= ep.handler %>);
+<% } -%>
+}

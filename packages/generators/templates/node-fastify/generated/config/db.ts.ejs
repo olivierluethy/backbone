@@ -1,0 +1,52 @@
+import knex from "knex";
+import { env } from "./env";
+
+/**
+ * Shared Knex instance for the Fastify backend. This mirrors the Express preset's data layer so
+ * both stacks read and write an identical schema. Generated — do not edit.
+ *
+ * The `caseMapping` below bridges two naming worlds automatically:
+ *   - all TypeScript code (models, services, controllers) speaks camelCase;
+ *   - the SQL columns produced by the migrations are snake_case.
+ * `wrapIdentifier` rewrites outgoing identifiers camelCase -> snake_case, and
+ * `postProcessResponse` rewrites incoming row keys snake_case -> camelCase.
+ */
+const camelToSnake = (s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+const snakeToCamel = (s: string) => s.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+
+function mapKeysDeep(row: unknown): unknown {
+  if (Array.isArray(row)) return row.map(mapKeysDeep);
+  if (row && typeof row === "object") {
+    return Object.fromEntries(
+      Object.entries(row as Record<string, unknown>).map(([k, v]) => [snakeToCamel(k), v]),
+    );
+  }
+  return row;
+}
+
+const caseMapping = {
+  wrapIdentifier: (value: string, origImpl: (v: string) => string) =>
+    origImpl(value === "*" ? value : camelToSnake(value)),
+  postProcessResponse: (result: unknown) => mapKeysDeep(result),
+};
+
+/** SQLite by default (zero setup); switch to MySQL by setting DB_CLIENT=mysql2 in the env. */
+export const db =
+  env.DB_CLIENT === "mysql2"
+    ? knex({
+        client: "mysql2",
+        connection: {
+          host: env.DB_HOST,
+          port: env.DB_PORT,
+          user: env.DB_USER,
+          password: env.DB_PASSWORD,
+          database: env.DB_NAME,
+        },
+        ...caseMapping,
+      })
+    : knex({
+        client: "better-sqlite3",
+        connection: { filename: env.DB_FILE },
+        useNullAsDefault: true,
+        ...caseMapping,
+      });

@@ -2,12 +2,33 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, resolve, relative, isAbsolute, sep, extname, basename } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
+import { execFile } from "node:child_process";
 import express from "express";
 import cors from "cors";
 import archiver from "archiver";
-import { canonicalizeBlueprint, type Architecture, type Blueprint, type Runtime } from "@backbone/core";
+import {
+  ARCHITECTURE_DESCRIPTIONS,
+  ARCHITECTURE_LABELS,
+  architecturesForFramework,
+  ARCHITECTURES_BY_FRAMEWORK,
+  canonicalizeBlueprint,
+  DEFAULT_ARCHITECTURE,
+  defaultArchitectureFor,
+  defaultFrameworkFor,
+  disabledReason,
+  FRAMEWORK_LABELS,
+  FRAMEWORKS_BY_RUNTIME,
+  RUNTIME_LABELS,
+  RUNTIME_OF_FRAMEWORK,
+  RUNTIMES,
+  validateCombination,
+  type Architecture,
+  type Blueprint,
+  type Framework,
+  type Runtime,
+} from "@backbone/core";
 import { analyzeFrontend } from "@backbone/analyzer";
-import { generateBackend, listPresets } from "@backbone/generators";
+import { generateBackend, hasPreset, listPresets } from "@backbone/generators";
 
 /**
  * Thin pipeline server. It runs the deterministic analyzer/generators on disk — there is no
@@ -33,13 +54,85 @@ function isInside(base: string, target: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
+const ALL_ARCHITECTURES = Object.keys(ARCHITECTURE_LABELS) as Architecture[];
+
+/**
+ * Serialise the capability matrix for the client. For every framework we list *all*
+ * architectures with whether they are supported (offered), registered (generatable now), and,
+ * when unsupported, the reason — so the UI can grey + tooltip invalid options rather than hide
+ * them.
+ */
+function buildCapabilities() {
+  const frameworks: Record<
+    string,
+    {
+      label: string;
+      runtime: Runtime;
+      defaultArchitecture: Architecture;
+      architectures: Array<{
+        id: Architecture;
+        label: string;
+        description: string;
+        supported: boolean;
+        registered: boolean;
+        isDefault: boolean;
+        reason: string | null;
+      }>;
+    }
+  > = {};
+
+  for (const runtime of RUNTIMES) {
+    for (const framework of FRAMEWORKS_BY_RUNTIME[runtime]) {
+      frameworks[framework] = {
+        label: FRAMEWORK_LABELS[framework],
+        runtime,
+        defaultArchitecture: defaultArchitectureFor(framework),
+        architectures: ALL_ARCHITECTURES.map((a) => {
+          const supported = architecturesForFramework(framework).includes(a);
+          return {
+            id: a,
+            label: ARCHITECTURE_LABELS[a],
+            description: ARCHITECTURE_DESCRIPTIONS[a],
+            supported,
+            registered: hasPreset(runtime, framework, a),
+            isDefault: a === defaultArchitectureFor(framework),
+            reason: supported ? null : disabledReason(framework, a),
+          };
+        }),
+      };
+    }
+  }
+
+  return {
+    runtimes: RUNTIMES,
+    runtimeLabels: RUNTIME_LABELS,
+    frameworksByRuntime: FRAMEWORKS_BY_RUNTIME,
+    frameworkLabels: FRAMEWORK_LABELS,
+    architectureLabels: ARCHITECTURE_LABELS,
+    architectureDescriptions: ARCHITECTURE_DESCRIPTIONS,
+    architecturesByFramework: ARCHITECTURES_BY_FRAMEWORK,
+    defaultArchitecture: DEFAULT_ARCHITECTURE,
+    runtimeOfFramework: RUNTIME_OF_FRAMEWORK,
+    defaultFrameworkByRuntime: Object.fromEntries(
+      RUNTIMES.map((r) => [r, defaultFrameworkFor(r)]),
+    ) as Record<Runtime, Framework>,
+    frameworks,
+  };
+}
+
 app.get("/api/meta", (_req, res) => {
   res.json({
     repoRoot: REPO_ROOT,
     home: HOME,
     demoPath: "examples/demo-frontend",
     presets: listPresets(),
+    capabilities: buildCapabilities(),
+    vscode: vscodeAvailable(),
   });
+});
+
+app.get("/api/capabilities", (_req, res) => {
+  res.json(buildCapabilities());
 });
 
 app.get("/api/presets", (_req, res) => {
@@ -93,16 +186,22 @@ app.post("/api/analyze", (req, res) => {
   }
 });
 
-/** Where a given runtime/architecture would write, and whether it already exists. */
-function targetFor(runtime: string, architecture: string, outDir?: string): string {
-  return outDir ? resolvePath(outDir) : join(REPO_ROOT, "generated-backends", `${runtime}-${architecture}`);
+/** Where a given runtime/framework/architecture would write, and whether it already exists. */
+function targetFor(runtime: string, framework: string, architecture: string, outDir?: string): string {
+  return outDir
+    ? resolvePath(outDir)
+    : join(REPO_ROOT, "generated-backends", `${runtime}-${framework}-${architecture}`);
 }
 
 app.get("/api/target-status", (req, res) => {
-  const runtime = String(req.query.runtime ?? "node");
+  const reqRuntime = String(req.query.runtime ?? "node");
+  const framework = String(req.query.framework ?? defaultFrameworkFor(reqRuntime as Runtime));
+  // The framework decides the runtime (each framework belongs to exactly one), so a stale/
+  // mismatched runtime from the client can never desync the target path.
+  const runtime = RUNTIME_OF_FRAMEWORK[framework as Framework] ?? reqRuntime;
   const architecture = String(req.query.architecture ?? "layered");
   const outDir = typeof req.query.outDir === "string" ? req.query.outDir : undefined;
-  const target = targetFor(runtime, architecture, outDir);
+  const target = targetFor(runtime, framework, architecture, outDir);
   const lockExists = existsSync(join(target, "blueprint.lock.json"));
   res.json({
     target,
@@ -114,23 +213,29 @@ app.get("/api/target-status", (req, res) => {
 });
 
 app.post("/api/generate", (req, res) => {
-  const { blueprint, runtime, architecture, dialect, outDir } = req.body as {
+  const { blueprint, runtime, framework, architecture, dialect, outDir } = req.body as {
     blueprint?: Blueprint;
     runtime?: Runtime;
+    framework?: Framework;
     architecture?: Architecture;
     dialect?: "sqlite" | "mysql";
     outDir?: string;
   };
   if (!blueprint) return res.status(400).json({ error: "blueprint is required." });
-  const rt = (runtime ?? "node") as Runtime;
-  const arch = (architecture ?? "layered") as Architecture;
-  const target = targetFor(rt, arch, outDir);
+  const fw = (framework ?? defaultFrameworkFor((runtime ?? "node") as Runtime)) as Framework;
+  // The framework is authoritative: derive its runtime so a mismatched `runtime` from the client
+  // (e.g. a selector desync) can never produce a spurious "not a PHP framework" error.
+  const rt = (RUNTIME_OF_FRAMEWORK[fw] ?? runtime ?? "node") as Runtime;
+  const arch = (architecture ?? defaultArchitectureFor(fw)) as Architecture;
+  const invalid = validateCombination(rt, fw, arch);
+  if (invalid) return res.status(400).json({ error: invalid });
+  const target = targetFor(rt, fw, arch, outDir);
   const wasRegenerate = existsSync(join(target, "blueprint.lock.json"));
   const generatedAt = new Date().toISOString();
   try {
     const result = generateBackend(
       blueprint,
-      { runtime: rt, architecture: arch, outDir: target, dialect: dialect ?? "sqlite" },
+      { runtime: rt, framework: fw, architecture: arch, outDir: target, dialect: dialect ?? "sqlite" },
       generatedAt,
     );
     return res.json({
@@ -222,13 +327,6 @@ function streamZip(res: express.Response, name: string, add: (a: archiver.Archiv
   void archive.finalize();
 }
 
-/** Serve the built client if present (production). */
-const clientDist = join(HERE, "..", "dist");
-if (existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-  app.get("*", (_req, res) => res.sendFile(join(clientDist, "index.html")));
-}
-
 interface TreeNode {
   name: string;
   path: string; // dir-relative, POSIX
@@ -297,6 +395,67 @@ function languageFor(file: string): string {
   return byExt[ext] ?? "text";
 }
 
+/* ------------------------------------------------------------------ *
+ * Open in VS Code — shell out to the `code` CLI on the server host.
+ * ------------------------------------------------------------------ */
+
+// Cached availability of the `code` CLI, probed once at startup.
+let vscodeReady = false;
+
+/** Probe whether the VS Code command-line launcher (`code`) is on PATH. */
+function probeVscode(): void {
+  execFile("code", ["--version"], { timeout: 4000 }, (err) => {
+    vscodeReady = !err;
+    if (vscodeReady) console.log("VS Code `code` CLI detected — Open in VS Code enabled.");
+  });
+}
+
+function vscodeAvailable(): boolean {
+  return vscodeReady;
+}
+
+app.get("/api/vscode-status", (_req, res) => {
+  res.json({ available: vscodeAvailable() });
+});
+
+/**
+ * Open a generated project folder (or a specific file within it) in the developer's locally
+ * installed VS Code. Always returns a `vscode://file/...` deep link as a fallback the client can
+ * use even when the CLI is unavailable.
+ */
+app.post("/api/open-vscode", (req, res) => {
+  const { dir: dirIn, path: rel } = req.body as { dir?: string; path?: string };
+  const dir = generatedDir(dirIn);
+  if (!dir) return res.status(400).json({ error: "Unknown or unsafe generated dir." });
+  const target = rel ? resolve(dir, rel) : dir;
+  if (!isInside(dir, target) || !existsSync(target)) {
+    return res.status(400).json({ error: "No such path." });
+  }
+  const deepLink = `vscode://file/${target.split(sep).join("/")}`;
+  if (!vscodeAvailable()) {
+    return res.status(200).json({
+      opened: false,
+      deepLink,
+      hint: "The VS Code `code` CLI was not found on the server host. Install it via VS Code → Command Palette → 'Shell Command: Install code command in PATH'.",
+    });
+  }
+  execFile("code", [target], { timeout: 6000 }, (err) => {
+    if (err) return res.status(200).json({ opened: false, deepLink, hint: String(err) });
+    return res.json({ opened: true, deepLink });
+  });
+});
+
+/**
+ * Serve the built client if present (production). Registered LAST so the catch-all `*` route
+ * never shadows the `/api/*` endpoints above.
+ */
+const clientDist = join(HERE, "..", "dist");
+if (existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get("*", (_req, res) => res.sendFile(join(clientDist, "index.html")));
+}
+
 app.listen(PORT, () => {
   console.log(`Backbone pipeline server on http://localhost:${PORT} (repo: ${REPO_ROOT})`);
+  probeVscode();
 });

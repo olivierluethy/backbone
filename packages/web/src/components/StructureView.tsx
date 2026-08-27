@@ -1,48 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import mermaid from "mermaid";
+import { useEffect, useMemo, useState } from "react";
 import type { Blueprint } from "@backbone/core";
 import { api, type TreeNode } from "../api";
+import { renderMermaid, token } from "./mermaid";
+import { DiagramCanvas } from "./DiagramCanvas";
 import { Button, Eyebrow } from "./primitives";
 
 type Mode = "entities" | "directory";
-
-/** Read a design token's concrete value so Mermaid (which needs real colours) stays on-palette. */
-function token(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#000";
-}
-
-let initialised = false;
-function initMermaid() {
-  const mono = '"IBM Plex Mono", ui-monospace, monospace';
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: "loose",
-    theme: "base",
-    fontFamily: mono,
-    themeVariables: {
-      background: token("--ink-800"),
-      primaryColor: token("--ink-700"),
-      primaryBorderColor: token("--rule"),
-      primaryTextColor: token("--paper-100"),
-      secondaryColor: token("--ink-600"),
-      tertiaryColor: token("--ink-800"),
-      lineColor: token("--rule"),
-      textColor: token("--paper-100"),
-      fontSize: "13px",
-      // ER diagram specifics
-      attributeBackgroundColorOdd: token("--ink-700"),
-      attributeBackgroundColorEven: token("--ink-800"),
-    },
-  });
-  initialised = true;
-}
 
 export function StructureView({ blueprint, dir }: { blueprint: Blueprint; dir: string }) {
   const [mode, setMode] = useState<Mode>("entities");
   const [tree, setTree] = useState<TreeNode[] | null>(null);
   const [svg, setSvg] = useState<string>("");
   const [copied, setCopied] = useState(false);
-  const idRef = useRef(0);
 
   useEffect(() => {
     api.generatedTree(dir).then(({ tree }) => setTree(tree)).catch(() => setTree([]));
@@ -54,12 +23,9 @@ export function StructureView({ blueprint, dir }: { blueprint: Blueprint; dir: s
   );
 
   useEffect(() => {
-    if (!initialised) initMermaid();
     let alive = true;
-    const id = `bb-mermaid-${idRef.current++}`;
-    mermaid
-      .render(id, source)
-      .then(({ svg }) => alive && setSvg(svg))
+    renderMermaid(source)
+      .then((out) => alive && setSvg(out))
       .catch((err) => alive && setSvg(`<pre class="mono text-danger-500">${String(err)}</pre>`));
     return () => {
       alive = false;
@@ -94,15 +60,12 @@ export function StructureView({ blueprint, dir }: { blueprint: Blueprint; dir: s
           {copied ? "Copied" : "Copy Mermaid source"}
         </Button>
       </div>
-      <div
-        className="drafting-grid overflow-auto rounded-md border border-line p-4 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-none"
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
+      <DiagramCanvas svg={svg} ariaLabel={`Structure diagram — ${mode}`} />
     </div>
   );
 }
 
-/** Deterministic ER diagram from the Blueprint (entities + fields + relations). */
+/** Deterministic, compact ER diagram from the Blueprint (entities + fields + relations). */
 function entityDiagram(bp: Blueprint): string {
   const lines: string[] = ["erDiagram"];
   const seen = new Set<string>();
@@ -128,25 +91,45 @@ function entityDiagram(bp: Blueprint): string {
   return lines.join("\n");
 }
 
-/** Deterministic directory flowchart from the generated file tree. */
+function esc(s: string): string {
+  return s.replace(/"/g, "'");
+}
+
+/**
+ * Compact directory diagram: folders become nested Mermaid `subgraph`s that visually group their
+ * own files, instead of one sprawling left-to-right graph. Generated files carry the verdigris
+ * boundary colour. Node labels are just the file/folder name to stay space-efficient.
+ */
 function directoryDiagram(tree: TreeNode[]): string {
-  const lines: string[] = ["graph LR", "  classDef gen fill:transparent,stroke-dasharray:0;"];
+  const gen = token("--verd-400");
+  const lines: string[] = ["flowchart TB", `  classDef gen color:${gen},stroke-width:1px;`];
   let id = 0;
-  const nodeId = () => `n${id++}`;
-  const walk = (nodes: TreeNode[], parent: string | null) => {
-    for (const n of nodes) {
-      const nid = nodeId();
-      if (n.type === "dir") {
-        lines.push(`  ${nid}[["${n.name}/"]]`);
-      } else {
-        lines.push(`  ${nid}["${n.name}"]`);
-      }
-      if (parent) lines.push(`  ${parent} --> ${nid}`);
-      if (n.children) walk(n.children, nid);
+  const nextId = () => `n${id++}`;
+  const generated: string[] = [];
+
+  const walk = (nodes: TreeNode[]) => {
+    // Files first (as leaf nodes), then folders (as subgraphs) — keeps each group tidy.
+    const files = nodes.filter((n) => n.type === "file");
+    const dirs = nodes.filter((n) => n.type === "dir");
+    for (const f of files) {
+      const nid = nextId();
+      lines.push(`  ${nid}["${esc(f.name)}"]`);
+      if (f.generated) generated.push(nid);
+    }
+    for (const d of dirs) {
+      const nid = nextId();
+      lines.push(`  subgraph ${nid}["${esc(d.name)}/"]`);
+      lines.push("    direction TB");
+      if (d.children && d.children.length) walk(d.children);
+      lines.push("  end");
     }
   };
-  const rootId = nodeId();
-  lines.push(`  ${rootId}[["project/"]]`);
-  walk(tree, rootId);
+
+  lines.push(`  subgraph root["project/"]`);
+  lines.push("    direction TB");
+  if (tree.length) walk(tree);
+  else lines.push(`    ${nextId()}["(no files yet)"]`);
+  lines.push("  end");
+  if (generated.length) lines.push(`  class ${generated.join(",")} gen;`);
   return lines.join("\n");
 }

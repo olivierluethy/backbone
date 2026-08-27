@@ -1,0 +1,48 @@
+import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { createAuthService } from "./auth.service";
+
+/**
+ * Auth route plugin: register / login / me. Generated — do not edit.
+ *
+ * The auth service is constructed with `fastify.jwt.sign` so tokens are minted through the
+ * @fastify/jwt plugin registered in plugins/auth.ts (which must be registered first). Bodies are
+ * validated with zod; failures surface as 422 via the shared error handler.
+ */
+
+// Registration payload: credentials<% if (view.authUserExtraColumns.length) { %> plus any extra user columns from the Blueprint<% } %>.
+const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+<% for (const c of view.authUserExtraColumns) { -%>
+  <%= c.field %>: <%- c.zod %>.optional(),
+<% } -%>
+});
+
+// Login payload: email + non-empty password.
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+export async function authRoutes(fastify: FastifyInstance): Promise<void> {
+  const authService = createAuthService((payload) => fastify.jwt.sign(payload));
+
+  // POST /auth/register — create an account and return a token + public user.
+  fastify.post("/auth/register", async (request, reply) => {
+    const data = registerSchema.parse(request.body);
+    reply.code(201);
+    return authService.register(data);
+  });
+
+  // POST /auth/login — exchange credentials for a token + public user.
+  fastify.post("/auth/login", async (request) => {
+    const data = loginSchema.parse(request.body);
+    return authService.login(data);
+  });
+
+  // GET /auth/me — return the authenticated user's profile (Bearer token required).
+  fastify.get("/auth/me", { preHandler: [fastify.authenticate] }, async (request) => {
+    return authService.me(request.user.id);
+  });
+}

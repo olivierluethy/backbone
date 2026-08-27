@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Highlight, type PrismTheme } from "prism-react-renderer";
 import { ensurePrismLanguages } from "./prism-setup";
 
@@ -21,17 +21,24 @@ export function CodeViewer({
   path,
   language,
   content,
+  fontSize = 12,
   onCopy,
   onDownload,
+  actions,
 }: {
   path: string;
   language: string;
   content: string;
+  /** Editor font size in px (driven by the explorer's zoom control). */
+  fontSize?: number;
   onCopy?: () => void;
   onDownload?: () => void;
+  /** Extra header actions (e.g. Split, Open in VS Code) rendered before Copy/Download. */
+  actions?: ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
   const [langsReady, setLangsReady] = useState(false);
+  const lineHeight = Math.round(fontSize * 1.5);
 
   // Load the extra Prism grammars once, then re-render to apply highlighting.
   useEffect(() => {
@@ -57,6 +64,7 @@ export function CodeViewer({
           {path}
         </span>
         <span className="ml-auto flex items-center gap-1">
+          {actions}
           <IconButton label={copied ? "Copied" : "Copy"} onClick={copy} active={copied} />
           {onDownload && <IconButton label="Download" onClick={onDownload} />}
         </span>
@@ -64,12 +72,18 @@ export function CodeViewer({
       <div className="min-h-0 flex-1 overflow-auto bg-ink-800">
         <Highlight key={langsReady ? "hl" : "plain"} theme={theme} code={content.replace(/\n$/, "")} language={language}>
           {({ style, tokens, getLineProps, getTokenProps }) => (
-            <pre className="mono min-w-max py-2 text-mono leading-[18px]" style={{ ...style, background: "transparent" }}>
+            <pre
+              className="mono min-w-max py-2"
+              style={{ ...style, background: "transparent", fontSize: `${fontSize}px`, lineHeight: `${lineHeight}px` }}
+            >
               {tokens.map((line, i) => {
                 const lineProps = getLineProps({ line });
                 return (
                   <div key={i} {...lineProps} className={`flex ${lineProps.className ?? ""}`}>
-                    <span className="sticky left-0 mr-3 w-10 shrink-0 select-none border-r border-line bg-ink-800 pr-2 text-right text-slate-300">
+                    <span
+                      className="sticky left-0 mr-3 shrink-0 select-none border-r border-line bg-ink-800 pr-2 text-right text-slate-300"
+                      style={{ width: `${Math.max(32, String(tokens.length).length * 9 + 16)}px` }}
+                    >
                       {i + 1}
                     </span>
                     <span className="pr-4">

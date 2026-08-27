@@ -1,0 +1,42 @@
+<?php
+
+/**
+ * The REST API route table — OWNED by Backbone, regenerated to match the current Blueprint.
+ * Do not hand-edit: your changes are overwritten on the next generate. Add custom routes in a
+ * separate file wired up from bootstrap/app.php instead.
+ *
+ * Laravel serves everything here under the `/api` prefix. Each entity is exposed as a resource
+ * controller via `Route::apiResource`; the route model parameter is normalised to `{id}` so the
+ * generated controllers receive a plain `$id`.
+ */
+
+declare(strict_types=1);
+
+use Illuminate\Support\Facades\Route;
+<% for (const e of view.entities) { -%>
+use App\Generated\Http\Controllers\<%= e.className %>Controller;
+<% } -%>
+<% if (auth) { -%>
+use App\Generated\Http\Controllers\AuthController;
+<% } -%>
+
+<% for (const e of view.entities) {
+     const map = { index: "index", show: "show", store: "store", update: "update", destroy: "destroy" };
+     const only = e.endpoints.map((ep) => map[ep.handler]).filter(Boolean);
+     const uniqueOnly = [...new Set(only)];
+     const all = uniqueOnly.length === 5;
+-%>
+// <%= e.name %> — CRUD over the `<%= e.table %>` table (<%= uniqueOnly.join(", ") %>).
+Route::apiResource('<%= e.table %>', <%= e.className %>Controller::class)
+<% if (!all) { -%>
+    ->only([<%- uniqueOnly.map((o) => `'${o}'`).join(", ") %>])
+<% } -%>
+    ->parameters(['<%= e.table %>' => 'id']);
+
+<% } -%>
+<% if (auth) { -%>
+// Authentication — register / login are public; `me` requires a valid bearer token.
+Route::post('auth/register', [AuthController::class, 'register']);
+Route::post('auth/login', [AuthController::class, 'login']);
+Route::get('auth/me', [AuthController::class, 'me']);
+<% } -%>

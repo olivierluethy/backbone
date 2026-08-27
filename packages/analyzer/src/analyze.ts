@@ -10,6 +10,8 @@ import {
   type Entity,
 } from "@backbone/core";
 import { loadFrontend } from "./project.js";
+import { detectFrontend } from "./frontend.js";
+import { inferEntitiesFromEndpoints } from "./infer.js";
 import { collectDeclarations, draftEntity } from "./entities.js";
 import { collectEndpoints, type RawEndpoint } from "./endpoints.js";
 import { buildEntities } from "./relations.js";
@@ -54,6 +56,19 @@ export function analyzeFrontend(frontendPath: string): Blueprint {
   const drafts = entityDecls.map((d) => draftEntity(d, knownTypeNames, root));
   let entities = buildEntities(drafts, entityNames);
 
+  // Fallback for typeless frontends (plain JS, or models expressed only as API shapes): when no
+  // typed entities were found, infer coarse entities from the REST resources the frontend calls.
+  if (entities.length === 0) {
+    const inferred = inferEntitiesFromEndpoints(rawEndpoints);
+    if (inferred.length > 0) {
+      entities = inferred;
+      notes.push(
+        `No type declarations found — inferred ${inferred.length} entit${inferred.length === 1 ? "y" : "ies"} from API routes ` +
+          `(id + fields seen in request bodies). Refine with TypeScript interfaces or a backbone.manifest.`,
+      );
+    }
+  }
+
   const roles = collectRoles(entities);
 
   // Auth is required if a login/register call exists or any call carries a token.
@@ -72,6 +87,14 @@ export function analyzeFrontend(frontendPath: string): Blueprint {
   );
   const datastoreRequired = persisted || entities.length > 0;
 
+  // Deterministic frontend-framework detection (package.json deps + source signals).
+  const frontend = detectFrontend(root);
+  if (frontend.detected) {
+    notes.push(`Frontend framework: ${frontend.displayName}${frontend.version ? ` ${frontend.version}` : ""}.`);
+  } else {
+    notes.push("Frontend framework undetected (no conclusive dependency or source signal).");
+  }
+
   let bp: Blueprint = {
     ...emptyBlueprint(root),
     meta: { frontendPath: root, analyzer: ANALYZER_VERSION },
@@ -79,6 +102,7 @@ export function analyzeFrontend(frontendPath: string): Blueprint {
     endpoints,
     auth: { required: authRequired, roles },
     datastore: { required: datastoreRequired, dialect: "sqlite" },
+    frontend,
     notes: [...notes, ...describeCoverage(entities, endpoints)],
   };
 

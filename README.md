@@ -14,11 +14,17 @@ analyze  →  Blueprint (review / edit)  →  generate  →  regenerate (additiv
 ```
 
 - **Deterministic, not generative.** Same frontend in → same backend out, byte for byte.
-- **Three runtimes, five targets.** Node.js (Express + TS + Knex — layered or modular), PHP
-  (PDO), and Python (FastAPI + SQLAlchemy + Alembic, or Django + DRF), each SQLite out of the
-  box (MySQL/Postgres configurable).
+- **Two independent axes: framework × architecture.** Choose a **framework** — Node
+  (Express.js · NestJS · Fastify), PHP (Laravel · Symfony · plain PHP), Python (Django ·
+  FastAPI · Flask) — and, separately, an **architectural pattern** (Layered · Clean · Onion ·
+  Monolithic · MVC · MVVM · Microservices). A shared **capability matrix** decides which
+  combinations are valid; the UI greys the rest with a reason. SQLite out of the box.
+- **Frontend-framework detection.** The analyzer identifies the frontend framework (React,
+  Next.js, Vue, Angular, Svelte, Solid…) deterministically from `package.json` + source
+  signals, and surfaces it — or "undetected", never a guess.
 - **Traceable.** Every Blueprint node records the frontend `file:line` it came from; a
-  `GENERATION_REPORT.md` maps each requirement to the backend component it produced.
+  `GENERATION_REPORT.md` maps each requirement to the backend component it produced, and a
+  `docs/ARCHITECTURE.md` documents the chosen pattern's layering.
 - **Additive regeneration.** Change the frontend, regenerate: Backbone diffs the Blueprint,
   writes new timestamped migrations (never editing old ones), overwrites only the generated
   boundary, and never touches your own code.
@@ -41,12 +47,15 @@ pnpm --filter @backbone/web dev
 ```
 
 Open the printed URL and step through the pipeline: **Browse…** to pick a frontend folder
-(or type a path), analyze, review the Blueprint as an ERD of drafting cards with relation
-connectors, toggle entities / fields / endpoints, follow source-ref links back into the
-frontend, pick a runtime + framework, and generate. Results come with a formatted status
-summary, a **VS Code–style file explorer** (open files with syntax highlighting, copy or
-download individual files, **Download project (.zip)** or a selection), a **Mermaid
-structure** view (entity ER + directory graph), and the generation report. The action button
+(or type a path), analyze (the **detected frontend framework** shows as a badge), review the
+Blueprint as an ERD of drafting cards with relation connectors, toggle entities / fields /
+endpoints, follow source-ref links back into the frontend, pick a **runtime → framework →
+architecture** (invalid combinations are greyed with a reason), and generate. Results come
+with a formatted status summary, a **Database** view (a relational ER diagram with explicit
+1:1 / 1:N / N:N cardinalities), a **VS Code–grade file explorer** (resizable panes, tabs with
+single-click preview / double-click open, side-by-side split editor, editor zoom, per-file and
+whole-project **Open in VS Code**, copy / download / **Download project (.zip)** or a
+selection), a **Mermaid structure** view, and the generation report. The action button
 auto-labels **Generate** vs **Regenerate** based on the target; regenerating shows the
 additive change set.
 
@@ -59,16 +68,19 @@ pnpm bb analyze examples/demo-frontend --out blueprint.json
 # Review a saved Blueprint
 pnpm bb review blueprint.json
 
-# Generate a backend
-pnpm bb generate examples/demo-frontend --runtime node   --arch layered      --out ./backend-node
-pnpm bb generate examples/demo-frontend --runtime php    --arch layered      --out ./backend-php
-pnpm bb generate examples/demo-frontend --runtime python --framework fastapi --out ./backend-fastapi
-pnpm bb generate examples/demo-frontend --runtime python --framework django  --out ./backend-django
+# Generate a backend — pick a framework, and optionally an architecture
+# (--framework implies its runtime; --architecture defaults to the framework's idiomatic pattern)
+pnpm bb generate examples/demo-frontend --framework express  --architecture layered     --out ./backend-express
+pnpm bb generate examples/demo-frontend --framework nestjs   --architecture mvc         --out ./backend-nest
+pnpm bb generate examples/demo-frontend --framework fastify                              --out ./backend-fastify
+pnpm bb generate examples/demo-frontend --framework laravel                              --out ./backend-laravel
+pnpm bb generate examples/demo-frontend --framework fastapi  --architecture layered      --out ./backend-fastapi
 
 # Regenerate additively after the frontend changes
-pnpm bb regenerate --out ./backend-node --frontend examples/demo-frontend
+pnpm bb regenerate --out ./backend-express --frontend examples/demo-frontend
 
-# List the available template sets
+# See the full capability matrix (valid combinations, ● = generatable) and registered sets
+pnpm bb combos
 pnpm bb presets
 ```
 
@@ -82,11 +94,13 @@ cd backend-node && npm install && cp .env.example .env && npm run migrate && npm
 
 ## What gets detected
 
-From `src/**/*.ts|tsx`, using fixed rules:
+From `src/**/*.{ts,tsx,js,jsx,mjs,cjs}` (TypeScript **and** JavaScript), plus the `<script>`
+blocks of `.vue`/`.svelte` single-file components — so React, Vue, Angular, Svelte and Solid
+frontends are all analysable. Fixed rules:
 
 | Concept | Rule |
 |---|---|
-| **Entity** | an exported `interface`/`type` that is under `models/`·`types/`·`entities/`, is annotated `/** @entity */`, or is used as an API call's request/response payload |
+| **Entity** | an exported `interface`/`type` that is under `models/`·`types/`·`entities/`, is annotated `/** @entity */`, or is used as an API call's request/response payload. **Typeless JS fallback:** when a project has no type declarations, coarse entities are inferred per REST resource (id + fields seen in request bodies) and flagged in the Blueprint for refinement |
 | **Field** | name, nullability (`?` / `\| null`), TS type → primitive (`string`, `int`/`float`, `boolean`, `Date→datetime`, string-literal union → `enum`) |
 | **Relation** | entity-typed field → many-to-one (FK); `Entity[]` → one-to-many; `<name>Id` → FK; arrays on both sides → many-to-many via a join table |
 | **Endpoint** | `fetch`, `axios.<method>`, or a typed client `api.get/post/…`; HTTP method + URL → path pattern (`:id`) → CRUD, associated to an entity by payload type or path segment |
@@ -100,31 +114,39 @@ Only endpoints actually present in the frontend are generated. An optional
 
 ## Generated backend
 
-Both runtimes emit a complete, runnable project. Everything under the generated boundary
-(`src/generated/` for Node, `app/Generated/` for PHP) is **owned by Backbone** and
-overwritten on every regenerate; the thin entrypoint and project config outside it are
-written **once** and never touched again. Migrations are additive.
+Each framework emits a complete project. Everything under the generated boundary
+(`src/generated/`, `app/generated/`, `app/Generated/`, `src/Generated/`, …) is **owned by
+Backbone** and overwritten on every regenerate; the thin entrypoint and project config outside
+it are written **once** and never touched again. Every generated file carries English doc and
+section comments derived from the Blueprint. A `docs/ARCHITECTURE.md` documents the chosen
+pattern's layers and dependency rule.
 
-- **Node · layered / modular** — Express + TypeScript, Knex migrations, zod validation,
-  centralized error middleware, JWT auth (`/auth/register|login|me` + role guard + `users`),
-  SQLite default. `layered` groups by kind; `modular` groups by feature.
-- **PHP · layered** — PDO, per-entity validators, consistent JSON errors with correct status
-  codes, JWT auth (`firebase/php-jwt`), a `public/index.php` front controller, additive
-  migrations, SQLite default.
-- **Python · FastAPI** — FastAPI + SQLAlchemy 2 + Alembic, Pydantic v2 validation (camelCase
-  aliases), JWT auth (PyJWT + bcrypt), additive Alembic revisions, SQLite default.
-- **Python · Django** — Django + DRF + SimpleJWT, model-derived migrations (`makemigrations`),
-  camelCase JSON, SQLite default.
+Frameworks (idiomatic default architecture shown):
+
+- **Express.js · layered** — Express + TypeScript + Knex, zod validation, error middleware,
+  JWT auth; also ships a **monolithic** (feature-module) variant.
+- **NestJS · MVC** — Nest 10 + TypeORM + class-validator DTOs, per-entity modules, JWT guard.
+- **Fastify · layered** — Fastify 4 + Knex + zod, plugin-based routes, JWT.
+- **Laravel · MVC** — Eloquent models, resource controllers, FormRequest validators, api routes.
+- **Symfony · MVC** — Doctrine entities + attribute-routed controllers + repositories.
+- **Plain PHP · layered** — PDO, per-entity validators, a `public/index.php` front controller.
+- **Django · MVC** — Django + DRF + SimpleJWT, model-derived migrations, camelCase JSON.
+- **FastAPI · layered** — FastAPI + SQLAlchemy 2 + Alembic, Pydantic v2, JWT.
+- **Flask · layered** — Flask 3 + SQLAlchemy 2, blueprints per entity, PyJWT auth.
+
+The **architecture** axis (Layered · Clean · Onion · Monolithic · MVC · MVVM · Microservices)
+selects the project's structure and dependency direction independently of the framework; run
+`bb combos` to see which framework × architecture combinations are generatable in this build.
 
 ---
 
 ## Repository layout
 
 ```
-packages/core         Blueprint schema + shared types + naming/validation/diff helpers
-packages/analyzer     ts-morph analysis → Blueprint (deterministic detection)
-packages/generators   EJS template sets → runnable backends (node-layered, node-modular, php-layered)
-packages/cli          the `bb` CLI
+packages/core         Blueprint schema + shared types + the framework/architecture capability matrix
+packages/analyzer     ts-morph analysis → Blueprint (deterministic detection, incl. frontend framework)
+packages/generators   EJS template sets → runnable backends, keyed by runtime × framework × architecture
+packages/cli          the `bb` CLI (bb combos shows the matrix)
 packages/web          the pipeline web UI (thin Express server + React/Tailwind)
 examples/demo-frontend  a sample React+TS app the pipeline runs on
 docs/STYLEGUIDE.md    the visual system for the web UI
