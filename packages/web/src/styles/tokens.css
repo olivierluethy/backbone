@@ -1,0 +1,59 @@
+/* Backbone design tokens — the single source of truth from docs/STYLEGUIDE.md.
+   Dark, single-theme. Never hard-code a hex outside this file. */
+:root {
+  /* Ink ramp */
+  --ink-900: #0e1419;
+  --ink-800: #121a21;
+  --ink-700: #161f27;
+  --ink-600: #1c2833;
+  --ink-500: #243039;
+  --ink-400: #33424e;
+
+  /* Text */
+  --slate-300: #8497a6;
+  --slate-200: #aebecb;
+  --paper-100: #e8eef2;
+
+  /* Brass — detected-from-frontend */
+  --brass-600: #c8863a;
+  --brass-500: #e3a44c;
+  --brass-400: #eebe77;
+  --brass-050: #2a2013;
+
+  /* Verdigris — generated-into-backend */
+  --verd-600: #3e9186;
+  --verd-500: #4fb0a5;
+  --verd-400: #77c7bd;
+  --verd-050: #12211f;
+
+  /* Signals */
+  --danger-500: #d9634e;
+  --danger-050: #251510;
+  --warn-500: #d9a441;
+  --info-500: #5b93c4;
+
+  /* Semantic aliases */
+  --bg: var(--ink-900);
+  --surface: var(--ink-700);
+  --surface-raised: var(--ink-600);
+  --line: var(--ink-500);
+  --rule: var(--ink-400);
+  --text: var(--paper-100);
+  --text-muted: var(--slate-300);
+  --detected: var(--brass-500);
+  --generated: var(--verd-500);
+
+  /* Radius */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-pill: 999px;
+
+  /* Shadow (popovers only) */
+  --shadow-pop: 0 8px 24px -8px rgba(0, 0, 0, 0.55);
+
+  /* Type */
+  --font-display: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
