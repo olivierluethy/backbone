@@ -4,12 +4,14 @@ import { nodeLayeredPreset } from "./node-layered.js";
 import { nodeModularPreset } from "./node-modular.js";
 import { phpLayeredPreset } from "./php-layered.js";
 import { pythonFastapiPreset } from "./python-fastapi.js";
+import { pythonDjangoPreset } from "./python-django.js";
 
 const PRESETS: Preset[] = [
   nodeLayeredPreset,
   nodeModularPreset,
   phpLayeredPreset,
   pythonFastapiPreset,
+  pythonDjangoPreset,
 ];
 
 export interface PresetInfo {
