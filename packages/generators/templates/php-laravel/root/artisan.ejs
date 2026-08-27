@@ -1,0 +1,26 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * The Artisan console entry point — YOURS to keep (written once, never overwritten).
+ *
+ * Boots the Laravel application from bootstrap/app.php and hands the current CLI arguments to
+ * the console kernel. This is the standard Laravel 11 `artisan` stub; commands such as
+ * `php artisan migrate` and `php artisan serve` are provided by the framework once
+ * `composer install` has pulled in laravel/framework.
+ */
+
+use Symfony\Component\Console\Input\ArgvInput;
+
+define('LARAVEL_START', microtime(true));
+
+// Autoload Composer dependencies (Laravel framework + this app's App\ namespace).
+require __DIR__ . '/vendor/autoload.php';
+
+// Bootstrap Laravel and hand off to the console kernel.
+/** @var \Illuminate\Foundation\Application $app */
+$app = require_once __DIR__ . '/bootstrap/app.php';
+
+$status = $app->handleCommand(new ArgvInput());
+
+exit($status);

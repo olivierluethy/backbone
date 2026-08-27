@@ -1,0 +1,47 @@
+<?php
+
+/**
+ * Database config — YOURS to extend (written once, never overwritten).
+ *
+ * SQLite is the zero-setup default: the connection points at database/database.sqlite. A MySQL
+ * connection is included for when you outgrow SQLite — switch with `DB_CONNECTION=mysql`.
+ */
+
+return [
+    // The default connection, chosen by the DB_CONNECTION env var.
+    'default' => env('DB_CONNECTION', 'sqlite'),
+
+    'connections' => [
+        // --- SQLite (default, zero setup) ---
+        'sqlite' => [
+            'driver' => 'sqlite',
+            'url' => env('DB_URL'),
+            // Falls back to database/database.sqlite relative to the project root.
+            'database' => env('DB_DATABASE', database_path('database.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+        ],
+
+        // --- MySQL (optional) ---
+        'mysql' => [
+            'driver' => 'mysql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_DATABASE', 'backbone'),
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+            'engine' => null,
+        ],
+    ],
+
+    // The table that records which migrations have run.
+    'migrations' => [
+        'table' => 'migrations',
+        'update_date_on_publish' => true,
+    ],
+];

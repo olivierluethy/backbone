@@ -10,6 +10,7 @@ import { nodeExpressPresets } from "./node-express.js";
 import { nodeNestPresets } from "./node-nest.js";
 import { nodeFastifyPresets } from "./node-fastify.js";
 import { phpPlainPresets } from "./php-plain.js";
+import { phpLaravelPresets } from "./php-laravel.js";
 import { pythonFastapiPresets } from "./python-fastapi.js";
 import { pythonDjangoPresets } from "./python-django.js";
 import { pythonFlaskPresets } from "./python-flask.js";
@@ -25,6 +26,7 @@ const PRESETS: Preset[] = [
   ...nodeNestPresets,
   ...nodeFastifyPresets,
   ...phpPlainPresets,
+  ...phpLaravelPresets,
   ...pythonFastapiPresets,
   ...pythonDjangoPresets,
   ...pythonFlaskPresets,

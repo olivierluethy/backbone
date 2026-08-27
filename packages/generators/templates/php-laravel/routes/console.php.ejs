@@ -1,0 +1,15 @@
+<?php
+
+/**
+ * Console (Artisan) routes — YOURS to extend (written once, never overwritten).
+ *
+ * Closure-based Artisan commands are defined here. A single `inspire` command is included as a
+ * template; add your own scheduled tasks and one-off commands below.
+ */
+
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Artisan;
+
+Artisan::command('inspire', function (): void {
+    $this->comment(Inspiring::quote());
+})->purpose('Display an inspiring quote');
