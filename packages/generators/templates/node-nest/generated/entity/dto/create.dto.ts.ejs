@@ -1,0 +1,21 @@
+<% const imports = nest.validatorImports(e.writable); -%>
+<% if (imports.length) { -%>
+import { <%= imports.join(", ") %> } from "class-validator";
+<% } -%>
+
+/**
+ * Create DTO for <%= e.name %> (POST <%= e.routeBase %>). Backbone owns this file — do not edit.
+ *
+ * Contains only the writable columns of `<%= e.table %>` (<%= e.writable.map((c) => c.name).join(", ") || "none" %>);
+ * primary key and framework-managed timestamps are excluded. The class-validator decorators are
+ * enforced by the global ValidationPipe configured in main.ts.
+ */
+export class Create<%= e.className %>Dto {
+<% for (const c of e.writable) { -%>
+<% for (const d of nest.validators(c)) { -%>
+  <%- d %>
+<% } -%>
+  <%= c.field %><%= c.nullable ? "?" : "" %>: <%- c.tsType %>;
+
+<% } -%>
+}

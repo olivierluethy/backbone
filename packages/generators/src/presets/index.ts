@@ -7,6 +7,7 @@ import {
 } from "@backbone/core";
 import type { Preset } from "../types.js";
 import { nodeExpressPresets } from "./node-express.js";
+import { nodeNestPresets } from "./node-nest.js";
 import { nodeFastifyPresets } from "./node-fastify.js";
 import { phpPlainPresets } from "./php-plain.js";
 import { pythonFastapiPresets } from "./python-fastapi.js";
@@ -21,6 +22,7 @@ import { pythonFlaskPresets } from "./python-flask.js";
  */
 const PRESETS: Preset[] = [
   ...nodeExpressPresets,
+  ...nodeNestPresets,
   ...nodeFastifyPresets,
   ...phpPlainPresets,
   ...pythonFastapiPresets,

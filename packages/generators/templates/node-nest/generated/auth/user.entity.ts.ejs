@@ -1,0 +1,40 @@
+<% const roles = view.auth.roles;
+   const defaultRole = roles[0] || "member";
+   const extras = view.authUserExtraColumns; -%>
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from "typeorm";
+
+/**
+ * TypeORM entity for the reserved `users` table that backs authentication. Backbone owns this
+ * file — do not edit. Columns: id, email (unique), password_hash, role<% for (const c of extras) { %>, <%= c.name %><% } %>.
+ * The schema is created from this metadata when the DataSource runs with synchronize enabled.
+ */
+@Entity({ name: "users" })
+export class User {
+  @PrimaryGeneratedColumn({ name: "id" })
+  id!: number;
+
+  // Login identity — unique across all users.
+  @Column({ name: "email", type: "varchar", unique: true })
+  email!: string;
+
+  // Bcrypt hash of the password; the plaintext is never stored.
+  @Column({ name: "password_hash", type: "varchar" })
+  passwordHash!: string;
+
+  // Authorisation role<% if (roles.length) { %> (one of: <%- roles.map((r) => JSON.stringify(r)).join(", ") %>)<% } %>.
+  @Column({ name: "role", type: "varchar", default: <%- JSON.stringify(defaultRole) %> })
+  role!: string;
+<% for (const c of extras) { -%>
+
+  // Extra profile column `<%= c.name %>` folded in from the Blueprint's User entity.
+<% if (c.type === "enum") { -%>
+  @Column({ name: <%- JSON.stringify(c.name) %>, type: "simple-enum", enum: [<%- (c.enumValues ?? []).map((v) => JSON.stringify(v)).join(", ") %>], nullable: <%= c.nullable %> })
+<% } else { -%>
+  @Column({ name: <%- JSON.stringify(c.name) %>, type: <%- JSON.stringify(nest.ormType(c)) %>, nullable: <%= c.nullable %> })
+<% } -%>
+  <%= c.field %><%= c.nullable ? "?" : "" %>: <%- c.tsType %><%= c.nullable ? " | null" : "" %>;
+<% } -%>
+
+  @CreateDateColumn({ name: "created_at" })
+  createdAt!: Date;
+}

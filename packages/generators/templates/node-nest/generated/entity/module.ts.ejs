@@ -1,0 +1,20 @@
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { <%= e.className %> } from "./<%= e.varName %>.entity";
+import { <%= e.className %>Service } from "./<%= e.varName %>.service";
+import { <%= e.className %>Controller } from "./<%= e.varName %>.controller";
+
+/**
+ * Nest feature module for <%= e.name %> (`<%= e.table %>` table). Backbone owns this file — do not edit.
+ *
+ * `TypeOrmModule.forFeature([<%= e.className %>])` registers the entity's repository for injection
+ * into <%= e.className %>Service; the controller and service are wired as this module's HTTP layer
+ * and provider. The module is aggregated by GeneratedModule.
+ */
+@Module({
+  imports: [TypeOrmModule.forFeature([<%= e.className %>])],
+  controllers: [<%= e.className %>Controller],
+  providers: [<%= e.className %>Service],
+  exports: [<%= e.className %>Service],
+})
+export class <%= e.className %>Module {}

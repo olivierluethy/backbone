@@ -1,0 +1,10 @@
+import { PartialType } from "@nestjs/common";
+import { Create<%= e.className %>Dto } from "./create-<%= e.varName %>.dto";
+
+/**
+ * Update DTO for <%= e.name %> (PATCH <%= e.routeBase %>/:id). Backbone owns this file — do not edit.
+ *
+ * `PartialType` makes every field of Create<%= e.className %>Dto optional while preserving its
+ * class-validator rules, so partial updates only validate the fields actually supplied.
+ */
+export class Update<%= e.className %>Dto extends PartialType(Create<%= e.className %>Dto) {}

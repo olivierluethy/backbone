@@ -1,0 +1,30 @@
+import { Global, Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { JwtModule } from "@nestjs/jwt";
+import { User } from "./user.entity";
+import { AuthService } from "./auth.service";
+import { AuthController } from "./auth.controller";
+import { JwtGuard } from "./jwt.guard";
+
+/**
+ * Authentication module. Backbone owns this file — do not edit.
+ *
+ * Marked @Global so that JwtGuard (and the JwtService it depends on) can protect endpoints in
+ * every generated feature module without each module re-importing auth. It registers the `users`
+ * repository, configures @nestjs/jwt from the environment, and exports JwtGuard + JwtModule.
+ */
+@Global()
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([User]),
+    // JWT signing/verification secret and lifetime come from the environment (see .env.example).
+    JwtModule.register({
+      secret: process.env.JWT_SECRET ?? "change-me-in-production",
+      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? "7d" },
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService, JwtGuard],
+  exports: [JwtGuard, JwtModule],
+})
+export class AuthModule {}

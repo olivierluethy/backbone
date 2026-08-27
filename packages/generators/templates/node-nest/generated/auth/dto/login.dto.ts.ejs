@@ -1,0 +1,13 @@
+import { IsEmail, IsString } from "class-validator";
+
+/**
+ * Login DTO for POST /auth/login. Backbone owns this file — do not edit.
+ * Validated by the global ValidationPipe: a well-formed email and a non-empty password string.
+ */
+export class LoginDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  password!: string;
+}

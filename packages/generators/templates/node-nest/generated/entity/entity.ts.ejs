@@ -1,0 +1,27 @@
+<% const imports = nest.entityImports(e, view);
+   const rels = nest.relations(e, view);
+   const targets = nest.relationTargets(e, view); -%>
+import { <%= imports.join(", ") %> } from "typeorm";
+<% for (const t of targets) { -%>
+import { <%= t.className %> } from "../<%= t.varName %>/<%= t.varName %>.entity";
+<% } -%>
+
+/**
+ * TypeORM entity for the `<%= e.table %>` table (Blueprint entity: <%= e.name %>).
+ *
+ * Columns: <%= e.columns.map((c) => c.name).join(", ") %>.
+ * The schema is created from this metadata when the DataSource runs with synchronize enabled.
+ * Backbone owns this file — regenerated wholesale, do not edit.
+ */
+@Entity({ name: "<%= e.table %>" })
+export class <%= e.className %> {
+<% for (const c of e.columns) { -%>
+  <%- nest.columnDecorator(c) %>
+  <%= c.field %><%= c.nullable && !c.primaryKey ? "?" : "" %>: <%- c.tsType %><%= c.nullable && !c.primaryKey ? " | null" : "" %>;
+
+<% } -%>
+<% for (const r of rels) { -%>
+<%- r.code %>
+
+<% } -%>
+}

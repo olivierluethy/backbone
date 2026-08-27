@@ -1,0 +1,68 @@
+<% const defaultRole = view.auth.roles[0] || "member";
+   const extras = view.authUserExtraColumns; -%>
+import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { JwtService } from "@nestjs/jwt";
+import * as bcrypt from "bcryptjs";
+import { User } from "./user.entity";
+import { RegisterDto } from "./dto/register.dto";
+import { LoginDto } from "./dto/login.dto";
+
+/**
+ * Authentication logic over the reserved `users` table. Backbone owns this file — do not edit.
+ * Registers and logs users in, hashing passwords with bcrypt and issuing signed JWTs via
+ * @nestjs/jwt. New accounts default to the "<%= defaultRole %>" role.
+ */
+@Injectable()
+export class AuthService {
+  constructor(
+    @InjectRepository(User)
+    private readonly repo: Repository<User>,
+    private readonly jwt: JwtService,
+  ) {}
+
+  /** Serialise a user for API responses — never leak the password hash. */
+  private publicUser(u: User) {
+    return { id: u.id, email: u.email, role: u.role };
+  }
+
+  /** Sign a JWT carrying the user's id, email and role. */
+  private sign(u: User): string {
+    return this.jwt.sign({ sub: u.id, email: u.email, role: u.role });
+  }
+
+  /** Register a new account, rejecting duplicate emails, and return a token + public user. */
+  async register(dto: RegisterDto) {
+    const existing = await this.repo.findOne({ where: { email: dto.email } });
+    if (existing) throw new ConflictException("Email already registered");
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const user = this.repo.create({
+      email: dto.email,
+      passwordHash,
+      role: "<%= defaultRole %>",
+<% for (const c of extras) { -%>
+      <%= c.field %>: dto.<%= c.field %> ?? null,
+<% } -%>
+    } as Partial<User>);
+    const saved = await this.repo.save(user);
+    return { token: this.sign(saved), user: this.publicUser(saved) };
+  }
+
+  /** Verify credentials and return a token + public user, or 401 on any mismatch. */
+  async login(dto: LoginDto) {
+    const user = await this.repo.findOne({ where: { email: dto.email } });
+    if (!user) throw new UnauthorizedException("Invalid credentials");
+    const ok = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!ok) throw new UnauthorizedException("Invalid credentials");
+    return { token: this.sign(user), user: this.publicUser(user) };
+  }
+
+  /** Look up the currently authenticated user by id (from the verified JWT). */
+  async me(id: number) {
+    const user = await this.repo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException("User not found");
+    return this.publicUser(user);
+  }
+}

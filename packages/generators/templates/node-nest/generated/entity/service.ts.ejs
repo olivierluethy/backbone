@@ -1,0 +1,51 @@
+<% const idType = e.pkType === "uuid" ? "string" : "number"; -%>
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { <%= e.className %> } from "./<%= e.varName %>.entity";
+import { Create<%= e.className %>Dto } from "./dto/create-<%= e.varName %>.dto";
+import { Update<%= e.className %>Dto } from "./dto/update-<%= e.varName %>.dto";
+
+/**
+ * Business/data layer for <%= e.name %>, backed by a TypeORM repository over `<%= e.table %>`.
+ * Backbone owns this file — regenerated wholesale, do not edit. Extend behaviour in your own
+ * modules rather than here.
+ */
+@Injectable()
+export class <%= e.className %>Service {
+  constructor(
+    @InjectRepository(<%= e.className %>)
+    private readonly repo: Repository<<%= e.className %>>,
+  ) {}
+
+  /** Return every <%= e.name %> row. */
+  findAll(): Promise<<%= e.className %>[]> {
+    return this.repo.find();
+  }
+
+  /** Return one <%= e.name %> by primary key, or 404 if it does not exist. */
+  async findOne(id: <%= idType %>): Promise<<%= e.className %>> {
+    const found = await this.repo.findOne({ where: { id } as any });
+    if (!found) throw new NotFoundException(`<%= e.name %> ${id} not found`);
+    return found;
+  }
+
+  /** Persist a new <%= e.name %> from a validated create DTO. */
+  create(dto: Create<%= e.className %>Dto): Promise<<%= e.className %>> {
+    const entity = this.repo.create(dto as Partial<<%= e.className %>>);
+    return this.repo.save(entity);
+  }
+
+  /** Apply a partial update to an existing <%= e.name %> (404 if missing) and return it. */
+  async update(id: <%= idType %>, dto: Update<%= e.className %>Dto): Promise<<%= e.className %>> {
+    const entity = await this.findOne(id);
+    Object.assign(entity, dto);
+    return this.repo.save(entity);
+  }
+
+  /** Delete a <%= e.name %> by primary key (404 if missing). */
+  async remove(id: <%= idType %>): Promise<void> {
+    const entity = await this.findOne(id);
+    await this.repo.remove(entity);
+  }
+}
