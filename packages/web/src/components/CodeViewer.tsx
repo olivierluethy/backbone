@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Highlight, type PrismTheme } from "prism-react-renderer";
-import "./prism-setup";
+import { ensurePrismLanguages } from "./prism-setup";
 
 /** Syntax palette mapped to the Backbone tokens (styleguide 6.3) — no rainbow. */
 const theme: PrismTheme = {
@@ -31,6 +31,16 @@ export function CodeViewer({
   onDownload?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [langsReady, setLangsReady] = useState(false);
+
+  // Load the extra Prism grammars once, then re-render to apply highlighting.
+  useEffect(() => {
+    let alive = true;
+    ensurePrismLanguages().then(() => alive && setLangsReady(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function copy() {
     navigator.clipboard?.writeText(content).then(() => {
@@ -52,7 +62,7 @@ export function CodeViewer({
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-auto bg-ink-800">
-        <Highlight theme={theme} code={content.replace(/\n$/, "")} language={language}>
+        <Highlight key={langsReady ? "hl" : "plain"} theme={theme} code={content.replace(/\n$/, "")} language={language}>
           {({ style, tokens, getLineProps, getTokenProps }) => (
             <pre className="mono min-w-max py-2 text-mono leading-[18px]" style={{ ...style, background: "transparent" }}>
               {tokens.map((line, i) => {
