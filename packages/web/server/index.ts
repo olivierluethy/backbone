@@ -322,13 +322,6 @@ function streamZip(res: express.Response, name: string, add: (a: archiver.Archiv
   void archive.finalize();
 }
 
-/** Serve the built client if present (production). */
-const clientDist = join(HERE, "..", "dist");
-if (existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-  app.get("*", (_req, res) => res.sendFile(join(clientDist, "index.html")));
-}
-
 interface TreeNode {
   name: string;
   path: string; // dir-relative, POSIX
@@ -446,6 +439,16 @@ app.post("/api/open-vscode", (req, res) => {
     return res.json({ opened: true, deepLink });
   });
 });
+
+/**
+ * Serve the built client if present (production). Registered LAST so the catch-all `*` route
+ * never shadows the `/api/*` endpoints above.
+ */
+const clientDist = join(HERE, "..", "dist");
+if (existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get("*", (_req, res) => res.sendFile(join(clientDist, "index.html")));
+}
 
 app.listen(PORT, () => {
   console.log(`Backbone pipeline server on http://localhost:${PORT} (repo: ${REPO_ROOT})`);
