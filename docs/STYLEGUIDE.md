@@ -288,3 +288,73 @@ A ghost action (`1px --rule`, neutral bracket glyph — no external branding) at
 header + explorer toolbar) and per file (viewer header, compact). Disabled at `opacity .4` with a
 tooltip when the host `code` CLI is absent; a `vscode://file/…` deep link is the fallback. Transient
 status text in mono (`--verd-400` opening / `--warn-500` cli-missing / `--danger-500` error).
+
+## 8. Iteration 4 — persistence, grouped endpoints, diagram canvas, transparent change set
+
+These extend the system above; they introduce **no new hues** — every colour still comes from the
+ink ramp + brass (detected) / verdigris (generated) / signal tokens.
+
+### 8.1 Persistence & the "Clear project data" action
+Project working state persists client-side, keyed per analysed project. Persistence is invisible in
+the chrome — nothing new is shown for "it saved". The **Clear project data** control is a destructive
+ghost action (`1px --danger-500`, `--danger-500` text, hover `--danger-050`) that lives in the top bar
+beside the blueprint actions, and only appears once a project has persisted state. It opens a
+**confirm dialog** (§6.1 modal shell): measured eyebrow header, one plain sentence of consequence, a
+mono bullet list of exactly what is removed (Blueprint · endpoints · database · directory · change
+set), a ghost **Cancel** and a solid `--danger-500` **Clear project data** confirm. `Esc` and scrim
+dismiss. On confirm the UI resets to the empty Welcome state and a **toast** confirms.
+
+### 8.2 Toast (transient confirmation)
+A single bottom-right toast: `--surface-raised`, `1px --rule`, `--r-md`, `--shadow-pop`, `10px 14px`,
+a `2px` left marker in the semantic accent (`--verd-500` success · `--danger-500` error · `--rule`
+neutral), a mono eyebrow-less line of `--text`. Slides up `180ms ease`, auto-dismisses after ~2.8s,
+respects `prefers-reduced-motion`. Never stacks more than one; a new toast replaces the current.
+
+### 8.3 Grouped endpoints
+The flat endpoints table becomes **collapsible resource groups**. Each group is a framed row on
+`--surface`: a header button (`--ink-700`, hover `--ink-600`) carrying a disclosure chevron
+(rotates `90°` open, `120ms`), the resource name in `--t-h3` `--text`, a mono `· N` count, and a
+compact **method tally** of the group's HTTP-method chips. Expanded, the group reveals the existing
+endpoint rows (method chip, mono path, operation, entity, `🔒` auth, source-ref, generate toggle) —
+unchanged in content, only reparented. Methods order consistently **GET · POST · PUT · PATCH ·
+DELETE**. Resource = the endpoint's `entity`, else the first non-parameter path segment, else
+`general`. Group open/closed state persists with the project.
+
+### 8.4 Shared diagram canvas (zoom / pan / fit)
+One reusable canvas frames every diagram (Database ER, Structure entities, Structure directory). The
+frame is the drafting-grid ground (§1.4) in a `1px --line` surface, `overflow:hidden`, `min-height`
+`320px`, `max-height` `72vh`. A **toolbar** sits top-right inside the frame: ghost icon-buttons
+`−` / `reset` / `+` / **Fit** (`1px --rule`, `--surface-raised`, `28px`), plus a mono `NN%` zoom
+readout in `--text-muted`. The diagram is a transform layer (`translate()` + `scale()`,
+`transform-origin: 0 0`); **click-drag pans** (cursor `grab`→`grabbing`), **wheel/⌘-wheel zooms**
+toward the pointer, **Fit** frames the content with an `~8%` margin, **reset** returns to 100% at
+top-left. Zoom range `0.2–4×`. Controls are keyboard-focusable; `prefers-reduced-motion` drops the
+ease. The header above the frame keeps the existing eyebrow, mode toggles, and **Copy … source**.
+
+### 8.5 Database ER — readable default
+The ER diagram renders at a **readable default** (fit-to-view on first paint, never sub-legible) inside
+§8.4. Tables list every column with `PK`/`FK` markers; relations carry crow's-foot cardinality with an
+explicit `1:1 / 1:N / N:N` label; the three-chip cardinality legend (§7.3) still precedes the frame.
+
+### 8.6 Compact structure
+Both structure diagrams are **compact**: shorter node labels, tighter Mermaid spacing
+(`nodeSpacing`/`rankSpacing` reduced), and the **Directory** view groups files inside their folder as
+nested Mermaid `subgraph`s (folder title `--brass-400`, files `--text`, the `generated/` boundary in
+`--verd-400`) rather than one sprawling left-to-right graph. Large trees fit via §8.4's Fit control.
+
+### 8.7 Transparent change set
+The regeneration change set leads with an **impact summary header**: two mono tallies
+`entities — X added · Y modified · Z deleted` and `endpoints — …`, each count coloured in the diff
+palette (added `--verd-500`, modified `--brass-500`, deleted `--danger-500`, zero `--text-muted`), and
+a one-line **legend** for the `+ / ~ / −` markers. Below, changes group by kind under measured
+sub-eyebrows. Each change is a **diff row**: a gutter glyph (`+`/`~`/`−`) in its palette colour, a mono
+label, and a `--text-muted` **context clause** explaining the change where derivable ("new type
+detected", "no longer called by the frontend", "migration appended"). **Deletions are explicit** —
+labelled `deleted`, name struck through in `--danger-500`. **Modifications show field-level detail**:
+the changed entity lists its added/removed/changed fields as inline mono chips in the diff palette.
+Unchanged items are omitted. The whole set is computed deterministically from the blueprint diff and
+persists with the project, so it never flickers between generations.
+
+### 8.8 English-locale timestamps
+All rendered date-times use an explicit English locale (`en-GB`, `27 Aug 2026, 10:41 PM`) — never the
+host's default locale — with the raw ISO string in the `title`.
