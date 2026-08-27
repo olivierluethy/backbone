@@ -1,0 +1,12 @@
+<% const needsAuth = e.endpoints.some((ep) => ep.auth); -%>
+import { Router } from "express";
+import { <%= e.className %>Controller } from "./<%= e.varName %>.controller";
+<% if (needsAuth) { -%>
+import { authRequired } from "../../shared/middleware/auth";
+<% } -%>
+
+/** Routes for the <%= e.name %> module. Generated — do not edit. */
+export const <%= e.varName %>Router = Router();
+<% for (const ep of e.endpoints) { -%>
+<%= e.varName %>Router.<%= ep.method.toLowerCase() %>("<%= ep.httpPath %>", <% if (ep.auth) { %>authRequired, <% } %><%= e.className %>Controller.<%= ep.handler %>);
+<% } -%>

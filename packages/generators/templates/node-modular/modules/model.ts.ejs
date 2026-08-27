@@ -1,0 +1,61 @@
+<% const hasCreated = e.columns.some((c) => c.name === "created_at");
+   const hasUpdated = e.columns.some((c) => c.name === "updated_at");
+   const boolFields = e.columns.filter((c) => c.type === "boolean").map((c) => c.field);
+   const jsonFields = e.columns.filter((c) => c.type === "json").map((c) => c.field); -%>
+import { db } from "../../shared/config/db";
+import type { <%= e.className %> } from "../../shared/types";
+
+/**
+ * Repository for `<%= e.table %>` — thin data access over Knex. Generated — do not edit.
+ */
+const TABLE = "<%= e.table %>";
+<% if (boolFields.length) { %>const BOOL_FIELDS = [<%- boolFields.map((f) => JSON.stringify(f)).join(", ") %>] as const;
+<% } %><% if (jsonFields.length) { %>const JSON_FIELDS = [<%- jsonFields.map((f) => JSON.stringify(f)).join(", ") %>] as const;
+<% } %>
+/** SQLite stores booleans as 0/1 and json as text; decode rows back to their TS types. */
+function decode(row: any): <%= e.className %> {
+<% if (boolFields.length) { -%>
+  for (const f of BOOL_FIELDS) if (row?.[f] != null) row[f] = Boolean(row[f]);
+<% } -%>
+<% if (jsonFields.length) { -%>
+  for (const f of JSON_FIELDS) if (typeof row?.[f] === "string") { try { row[f] = JSON.parse(row[f]); } catch { /* leave as-is */ } }
+<% } -%>
+  return row;
+}
+
+/** Encode a payload for storage (json objects -> text). */
+function encode(data: Partial<<%= e.className %>>): Record<string, unknown> {
+  const row: Record<string, unknown> = { ...data };
+<% if (jsonFields.length) { -%>
+  for (const f of JSON_FIELDS) if (row[f] != null && typeof row[f] !== "string") row[f] = JSON.stringify(row[f]);
+<% } -%>
+  return row;
+}
+
+export const <%= e.className %>Model = {
+  async findAll(): Promise<<%= e.className %>[]> {
+    return (await db(TABLE).select("*")).map(decode);
+  },
+
+  async findById(id: <%= e.pkType === "uuid" ? "string" : "number" %>): Promise<<%= e.className %> | undefined> {
+    const row = await db(TABLE).where({ id }).first();
+    return row ? decode(row) : undefined;
+  },
+
+  async create(data: Partial<<%= e.className %>>): Promise<<%= e.className %>> {
+    const row = { ...encode(data)<% if (hasCreated) { %>, createdAt: new Date().toISOString()<% } %><% if (hasUpdated) { %>, updatedAt: new Date().toISOString()<% } %> };
+    const [id] = await db(TABLE).insert(row);
+    return (await this.findById(id as <%= e.pkType === "uuid" ? "string" : "number" %>))!;
+  },
+
+  async update(id: <%= e.pkType === "uuid" ? "string" : "number" %>, data: Partial<<%= e.className %>>): Promise<<%= e.className %> | undefined> {
+    const row = { ...encode(data)<% if (hasUpdated) { %>, updatedAt: new Date().toISOString()<% } %> };
+    await db(TABLE).where({ id }).update(row);
+    return this.findById(id);
+  },
+
+  async remove(id: <%= e.pkType === "uuid" ? "string" : "number" %>): Promise<boolean> {
+    const count = await db(TABLE).where({ id }).del();
+    return count > 0;
+  },
+};

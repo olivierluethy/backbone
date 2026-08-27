@@ -1,0 +1,46 @@
+<% const ops = new Set(e.endpoints.map((ep) => ep.operation));
+   const idCast = e.pkType === "uuid" ? "req.params.id" : "Number(req.params.id)";
+   const needCreate = ops.has("create");
+   const needUpdate = ops.has("update"); -%>
+import type { Request, Response } from "express";
+import { asyncHandler } from "../../shared/middleware/error";
+import { <%= e.className %>Service } from "./<%= e.varName %>.service";
+<% if (needCreate || needUpdate) { -%>
+import { <%= [needCreate ? "createSchema" : null, needUpdate ? "updateSchema" : null].filter(Boolean).join(", ") %> } from "./<%= e.varName %>.validator";
+<% } -%>
+
+/** HTTP handlers for <%= e.name %>. Generated — do not edit. */
+export const <%= e.className %>Controller = {
+<% if (ops.has("list")) { -%>
+  index: asyncHandler(async (_req: Request, res: Response) => {
+    res.json(await <%= e.className %>Service.list());
+  }),
+
+<% } -%>
+<% if (ops.has("read")) { -%>
+  show: asyncHandler(async (req: Request, res: Response) => {
+    res.json(await <%= e.className %>Service.get(<%= idCast %>));
+  }),
+
+<% } -%>
+<% if (needCreate) { -%>
+  store: asyncHandler(async (req: Request, res: Response) => {
+    const data = createSchema.parse(req.body);
+    res.status(201).json(await <%= e.className %>Service.create(data));
+  }),
+
+<% } -%>
+<% if (needUpdate) { -%>
+  update: asyncHandler(async (req: Request, res: Response) => {
+    const data = updateSchema.parse(req.body);
+    res.json(await <%= e.className %>Service.update(<%= idCast %>, data));
+  }),
+
+<% } -%>
+<% if (ops.has("delete")) { -%>
+  destroy: asyncHandler(async (req: Request, res: Response) => {
+    await <%= e.className %>Service.remove(<%= idCast %>);
+    res.status(204).send();
+  }),
+<% } -%>
+};
