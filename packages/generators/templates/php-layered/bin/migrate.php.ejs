@@ -1,0 +1,54 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Migration runner. Applies pending `migrations/NNNN_*.php` files in filename order and
+ * records them in the `_migrations` table so each runs exactly once. Additive only.
+ *
+ * Each migration file returns `['up' => [ ...raw SQL statements... ]]`.
+ * Generated once by Backbone — safe to edit.
+ */
+
+require __DIR__ . '/../vendor/autoload.php';
+
+use App\Generated\Config\Env;
+use App\Generated\Config\Database;
+
+Env::load(__DIR__ . '/../.env');
+
+$pdo = Database::pdo();
+$pdo->exec('CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)');
+
+$applied = $pdo->query('SELECT name FROM _migrations')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+$appliedSet = array_flip($applied);
+
+$files = glob(__DIR__ . '/../migrations/*.php') ?: [];
+sort($files);
+
+$ran = 0;
+foreach ($files as $file) {
+    $name = basename($file);
+    if (isset($appliedSet[$name])) {
+        continue;
+    }
+    /** @var array{up: string[]} $migration */
+    $migration = require $file;
+    $pdo->beginTransaction();
+    try {
+        foreach ($migration['up'] as $sql) {
+            $pdo->exec($sql);
+        }
+        $stmt = $pdo->prepare('INSERT INTO _migrations (name, applied_at) VALUES (?, ?)');
+        $stmt->execute([$name, gmdate('c')]);
+        $pdo->commit();
+        echo "applied {$name}\n";
+        $ran++;
+    } catch (\Throwable $e) {
+        $pdo->rollBack();
+        fwrite(STDERR, "failed {$name}: {$e->getMessage()}\n");
+        exit(1);
+    }
+}
+
+echo $ran === 0 ? "Already up to date.\n" : "Applied {$ran} migration(s).\n";

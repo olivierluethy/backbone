@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Application entry point. This file is yours — Backbone writes it once and never touches it
+ * again. The generated API lives under `app/Generated/` and is dispatched below; add your own
+ * routes and middleware where marked.
+ */
+
+require __DIR__ . '/../vendor/autoload.php';
+
+use App\Generated\Config\Env;
+use App\Generated\Http\Router;
+use App\Generated\Middleware\ErrorHandler;
+use App\Generated\Support\Response;
+
+Env::load(__DIR__ . '/../.env');
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$path = rawurldecode(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
+
+/** @var array<int, array<string, mixed>> $routes */
+$routes = require __DIR__ . '/../app/Generated/Routes/routes.php';
+$router = new Router($routes);
+
+// --- Add your custom routes here (register on $router before dispatch) ---
+
+ErrorHandler::run(function () use ($router, $method, $path): void {
+    if ($method === 'GET' && $path === '/health') {
+        Response::json(['status' => 'ok']);
+        return;
+    }
+    $router->dispatch($method, $path);
+});
