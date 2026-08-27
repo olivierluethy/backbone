@@ -94,11 +94,13 @@ cd backend-node && npm install && cp .env.example .env && npm run migrate && npm
 
 ## What gets detected
 
-From `src/**/*.ts|tsx`, using fixed rules:
+From `src/**/*.{ts,tsx,js,jsx,mjs,cjs}` (TypeScript **and** JavaScript), plus the `<script>`
+blocks of `.vue`/`.svelte` single-file components — so React, Vue, Angular, Svelte and Solid
+frontends are all analysable. Fixed rules:
 
 | Concept | Rule |
 |---|---|
-| **Entity** | an exported `interface`/`type` that is under `models/`·`types/`·`entities/`, is annotated `/** @entity */`, or is used as an API call's request/response payload |
+| **Entity** | an exported `interface`/`type` that is under `models/`·`types/`·`entities/`, is annotated `/** @entity */`, or is used as an API call's request/response payload. **Typeless JS fallback:** when a project has no type declarations, coarse entities are inferred per REST resource (id + fields seen in request bodies) and flagged in the Blueprint for refinement |
 | **Field** | name, nullability (`?` / `\| null`), TS type → primitive (`string`, `int`/`float`, `boolean`, `Date→datetime`, string-literal union → `enum`) |
 | **Relation** | entity-typed field → many-to-one (FK); `Entity[]` → one-to-many; `<name>Id` → FK; arrays on both sides → many-to-many via a join table |
 | **Endpoint** | `fetch`, `axios.<method>`, or a typed client `api.get/post/…`; HTTP method + URL → path pattern (`:id`) → CRUD, associated to an entity by payload type or path segment |
