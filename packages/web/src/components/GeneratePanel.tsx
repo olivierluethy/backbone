@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { marked } from "marked";
 import {
-  summarizeDiff,
   type Architecture,
   type Blueprint,
   type BlueprintDiff,
@@ -14,6 +13,7 @@ import { StatusBadges } from "./StatusBadges";
 import { FileExplorer } from "./FileExplorer";
 import { StructureView } from "./StructureView";
 import { DatabaseView } from "./DatabaseView";
+import { ChangeSet } from "./ChangeSet";
 import { OpenInVscode } from "./OpenInVscode";
 import { useProject } from "../store/ProjectContext";
 import type { ResultTab } from "../store/persistence";
@@ -105,7 +105,6 @@ export function GeneratePanel({
   }, [runtime, framework, architecture, result]);
 
   const willRegenerate = status?.mode === "regenerate";
-  const diffLines = result?.diff ? summarizeDiff(result.diff as BlueprintDiff) : [];
 
   return (
     <div>
@@ -229,18 +228,7 @@ export function GeneratePanel({
             </span>
           </div>
 
-          {diffLines.length > 0 && (
-            <div>
-              <Eyebrow count={diffLines.length}>Change set</Eyebrow>
-              <div className="mt-2 overflow-x-auto rounded-md border border-line bg-ink-800 p-3">
-                {diffLines.map((l, i) => (
-                  <div key={i} className={`mono whitespace-pre ${diffColor(l)}`}>
-                    {l}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {result.diff ? <ChangeSet diff={result.diff as BlueprintDiff} /> : null}
 
           {/* Tabbed results */}
           <div className="flex gap-1 border-b border-line">
@@ -270,11 +258,4 @@ export function GeneratePanel({
       )}
     </div>
   );
-}
-
-function diffColor(line: string): string {
-  if (line.startsWith("+")) return "text-verd-400";
-  if (line.startsWith("-")) return "text-danger-500";
-  if (line.startsWith("~")) return "text-brass-400";
-  return "text-text-muted";
 }
