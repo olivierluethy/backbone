@@ -31,22 +31,82 @@ analyze  →  Blueprint (review / edit)  →  generate  →  regenerate (additiv
 
 ---
 
-## Quickstart
+## Getting started (no coding experience needed)
 
-Requirements: Node 20+, pnpm. (PHP 8.1+ and Composer only to run a generated PHP backend.)
+You'll run a few copy‑paste commands in a **terminal** (Terminal on macOS/Linux, or PowerShell on
+Windows). Follow the steps in order. You only do steps 1–3 once; after that, starting the app is a
+single command.
+
+### Step 1 — Install the two tools it needs
+
+Backbone needs **Node.js** (the runtime) and **pnpm** (the installer). Install them once:
+
+1. **Node.js 20 or newer** — download the "LTS" installer from
+   [nodejs.org](https://nodejs.org) and run it (just click through).
+2. **pnpm** — after Node is installed, open your terminal and run:
+
+   ```bash
+   npm install -g pnpm
+   ```
+
+To check both are ready, run `node --version` (should print `v20` or higher) and `pnpm --version`.
+
+> PHP 8.1+ and Composer are **only** needed if you later want to *run* a generated PHP backend —
+> not to use Backbone itself.
+
+### Step 2 — Open the project folder in your terminal
+
+Point the terminal at this project folder with `cd` (short for "change directory"). For example, if
+the folder is on your Desktop:
+
+```bash
+cd ~/Desktop/Backbone      # macOS/Linux
+cd %USERPROFILE%\Desktop\Backbone   # Windows PowerShell
+```
+
+Tip: on most systems you can type `cd ` (with a space) and then drag the folder onto the terminal
+window to fill in the path.
+
+### Step 3 — One‑time setup
+
+Run these two commands once. The first downloads everything the project depends on (it can take a
+couple of minutes the first time); the second prepares the app.
 
 ```bash
 pnpm install
-pnpm build            # build the workspace packages
+pnpm build
 ```
 
-### The web UI (start here)
+### Step 4 — Start the app
 
 ```bash
-pnpm --filter @backbone/web dev
+pnpm web
 ```
 
-Open the printed URL and step through the pipeline: **Browse…** to pick a frontend folder
+This launches Backbone. Wait a few seconds until the terminal shows a line like
+`VITE ... ready` and a `Local:` link, then open this address in your web browser:
+
+**→ http://localhost:5410**
+
+That's the whole app. Leave the terminal window open while you use it — it's running the app in the
+background. To **stop** it, click the terminal and press **Ctrl + C**. To start it again another day,
+you only need step 4 (`pnpm web`) — not the setup steps.
+
+> **Why isn't `pnpm build` enough on its own?** `build` only *prepares* the code; it doesn't launch
+> anything. `pnpm web` is what actually *starts* the app (it runs two small local servers — the web
+> page on port **5410** and a helper on **5411** — for you automatically). Always use `pnpm web` to
+> open Backbone.
+
+**Something not working?**
+- *"command not found: pnpm"* → redo step 1 (`npm install -g pnpm`), then close and reopen the terminal.
+- *The browser page won't load* → make sure the terminal from step 4 is still open and hasn't shown an
+  error; give it a few seconds after `ready`, then refresh **http://localhost:5410**.
+- *Port already in use* → another copy is probably already running; press **Ctrl + C** in any old
+  terminal, or just open **http://localhost:5410**.
+
+### What you can do in the UI
+
+Step through the pipeline: **Browse…** to pick a frontend folder
 (or type a path), analyze (the **detected frontend framework** shows as a badge), review the
 Blueprint as an ERD of drafting cards with relation connectors, toggle entities / fields /
 endpoints, follow source-ref links back into the frontend, pick a **runtime → framework →
@@ -59,7 +119,10 @@ selection), a **Mermaid structure** view, and the generation report. The action 
 auto-labels **Generate** vs **Regenerate** based on the target; regenerating shows the
 additive change set.
 
-### The CLI
+### The CLI (optional — for developers)
+
+Prefer the terminal? The same pipeline is available as a `bb` command. You can skip this if you're
+using the web UI.
 
 ```bash
 # Analyse a frontend into a Blueprint (and print a traceable summary)

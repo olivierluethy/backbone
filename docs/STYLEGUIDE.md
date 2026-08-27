@@ -358,3 +358,48 @@ persists with the project, so it never flickers between generations.
 ### 8.8 English-locale timestamps
 All rendered date-times use an explicit English locale (`en-GB`, `27 Aug 2026, 10:41 PM`) — never the
 host's default locale — with the raw ISO string in the `title`.
+
+## 9. Iteration 5 — language file icons, runtime reconciliation, rendered Markdown
+
+The explorer's generic file glyph is replaced by language-aware icons; regeneration is made
+runtime-accurate (orphaned files removed, tree kept in sync); Markdown files gain a rendered view.
+Everything is drawn from the tokens in §1 — no new colours, no restyle of existing screens.
+
+### 9.1 Language file icons (measured lettermarks)
+Every file in the tree carries a **13×13 lettermark tile** instead of the old outline glyph: a
+`--r-sm` rounded square, a 1px accent border, a tinted fill, and a 1–3 char **monospace** code in the
+accent colour (`PY`, `TS`, `JS`, `PHP`, `MD`, `{}` for JSON, `YML`, `SQL`, `ENV`, `LCK`, `•` fallback).
+This is the §3 chip pattern shrunk to icon scale, so icons read as native drafting marks rather than an
+imported rainbow set. Hues stay inside the palette and encode *role*, not decoration:
+
+| Family | Colour | File types |
+| --- | --- | --- |
+| Runtime source | `--verd-500` fill `--verd-050` | `.py`, `.php` |
+| Frontend source | `--brass-500` fill `--brass-050` | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` |
+| Data / config | `--info-500` | `.json`, `.yml`/`.yaml`, `.sql`, `.env`/dotfiles |
+| Lockfiles | `--slate-300` | `package.json`, `composer.json`, `requirements.txt` (a small lock underline) |
+| Docs | `--info-500` | `.md` |
+| Fallback | `--slate-300` | unknown extensions |
+
+A single `extIcon(name)` mapping backs one shared `FileIcon` component, so the tile is identical
+everywhere the tree lists files and new extensions are one map entry away. Folders keep the §6.2
+`--brass-400` folder glyph and its chevron. Icon size tracks the row, never the editor zoom.
+
+### 9.2 Runtime-accurate regeneration
+Each `(runtime, framework, architecture)` writes to its own output directory, so switching runtime
+lands in a clean target by construction. Within a target, regeneration now **reconciles the owned
+boundary**: a sidecar `blueprint.manifest.json` records the runtime/framework/architecture and the exact
+list of owned files last written; on the next run, owned files that are no longer emitted (a deselected
+entity, a runtime whose templates moved) are **deleted**, never left as orphans. Write-once user files,
+accumulated migrations, and the tool docs are never deleted. Removed files surface in the result as a
+`--danger-500` **"N reconciled"** badge next to the mode badge (§6.4), and a runtime switch recorded in
+the manifest is called out in plain words.
+
+### 9.3 Rendered Markdown view
+Markdown files open **rendered by default** with a `--r-sm` segmented **Rendered / Source** toggle in the
+viewer header (§6.3), matching the §8.6 segmented control. Rendered prose uses the `.markdown-body`
+class — a superset of §8's `.report-md`: display headings, `--info-500` links, `--brass-400` inline
+code, bordered tables, `--brass-500` left-rule blockquotes, `--r-md` images, task lists, and fenced
+code blocks highlighted with the exact §6.3 Prism theme so code reads the same rendered or raw. The
+renderer is `react-markdown` + `remark-gfm`, sanitised with `rehype-sanitize`. **Copy** and **Download**
+always act on the raw file contents regardless of the active view; non-Markdown files are unchanged.

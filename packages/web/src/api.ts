@@ -63,6 +63,10 @@ export interface GenerateResult {
   report: string;
   fileCount: number;
   fileTree: string[];
+  /** Owned files removed to keep the output runtime-accurate (orphans from the previous run). */
+  removed: string[];
+  /** The runtime/framework the target held before this run, when this run switched it. */
+  switchedFrom: { runtime: Runtime; framework: Framework } | null;
 }
 
 export interface SourceSnippet {
@@ -91,6 +95,10 @@ export interface TargetStatus {
   exists: boolean;
   lockExists: boolean;
   mode: "generate" | "regenerate";
+  previousRuntime: Runtime | null;
+  previousFramework: Framework | null;
+  /** Set when regenerating here would switch runtime/framework away from what the target holds. */
+  runtimeSwitch: { runtime: Runtime; framework: Framework } | null;
 }
 
 export interface TreeNode {

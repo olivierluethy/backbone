@@ -1,13 +1,14 @@
 import type { Blueprint } from "@backbone/core";
 import type { GenerateResult } from "../api";
 
-type Tone = "text" | "brass" | "verd" | "muted";
+type Tone = "text" | "brass" | "verd" | "muted" | "danger";
 
 const toneClass: Record<Tone, string> = {
   text: "text-text",
   brass: "text-brass-400",
   verd: "text-verd-400",
   muted: "text-text-muted",
+  danger: "text-danger-500",
 };
 
 function Badge({ label, value, tone = "text", title }: { label: string; value: string; tone?: Tone; title?: string }) {
@@ -40,6 +41,8 @@ export function StatusBadges({
   const activeEntities = blueprint.entities.filter((e) => e.generate).length;
   const activeEndpoints = blueprint.endpoints.filter((e) => e.generate).length;
   const isRegen = result.mode === "regenerate";
+  const removed = result.removed ?? [];
+  const switchedFrom = result.switchedFrom ?? null;
 
   return (
     <div className="rounded-md border border-verd-500/40 bg-verd-050 p-4">
@@ -54,6 +57,25 @@ export function StatusBadges({
             : "first generation into an empty target."}
         </span>
       </div>
+
+      {(switchedFrom || removed.length > 0) && (
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-small">
+          {switchedFrom && (
+            <span className="text-text-muted">
+              Runtime switched from{" "}
+              <span className="mono text-brass-400">
+                {switchedFrom.runtime}/{switchedFrom.framework}
+              </span>{" "}
+              — the previous runtime's files were reconciled away.
+            </span>
+          )}
+          {removed.length > 0 && (
+            <span className="text-danger-500" title={removed.join("\n")}>
+              {removed.length} orphaned file{removed.length === 1 ? "" : "s"} removed.
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         <Badge label="Mode" value={isRegen ? "Regenerate" : "Generate"} tone={isRegen ? "brass" : "verd"} />
@@ -75,6 +97,14 @@ export function StatusBadges({
           tone={result.migrationFilename ? "verd" : "muted"}
           title={result.migrationFilename ?? undefined}
         />
+        {removed.length > 0 && (
+          <Badge
+            label="Reconciled"
+            value={`${removed.length} removed`}
+            tone="danger"
+            title={removed.join("\n")}
+          />
+        )}
         <Badge label="Generated at" value={when} tone="muted" title={iso} />
       </div>
     </div>
