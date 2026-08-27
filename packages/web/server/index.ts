@@ -28,7 +28,7 @@ import {
   type Runtime,
 } from "@backbone/core";
 import { analyzeFrontend } from "@backbone/analyzer";
-import { generateBackend, hasPreset, listPresets } from "@backbone/generators";
+import { generateBackend, hasPreset, listPresets, readManifest } from "@backbone/generators";
 
 /**
  * Thin pipeline server. It runs the deterministic analyzer/generators on disk — there is no
@@ -203,12 +203,22 @@ app.get("/api/target-status", (req, res) => {
   const outDir = typeof req.query.outDir === "string" ? req.query.outDir : undefined;
   const target = targetFor(runtime, framework, architecture, outDir);
   const lockExists = existsSync(join(target, "blueprint.lock.json"));
+  // A prior manifest tells us the runtime/framework the target currently holds, so the UI can warn
+  // when regenerating here would switch runtimes (and reconcile away the previous runtime's files).
+  const prev = readManifest(target);
+  const runtimeSwitch =
+    prev && (prev.runtime !== runtime || prev.framework !== framework)
+      ? { runtime: prev.runtime, framework: prev.framework }
+      : null;
   res.json({
     target,
     targetRel: relative(REPO_ROOT, target),
     exists: existsSync(target),
     lockExists,
     mode: lockExists ? "regenerate" : "generate",
+    previousRuntime: prev?.runtime ?? null,
+    previousFramework: prev?.framework ?? null,
+    runtimeSwitch,
   });
 });
 
