@@ -3,8 +3,14 @@ import type { Preset } from "../types.js";
 import { nodeLayeredPreset } from "./node-layered.js";
 import { nodeModularPreset } from "./node-modular.js";
 import { phpLayeredPreset } from "./php-layered.js";
+import { pythonFastapiPreset } from "./python-fastapi.js";
 
-const PRESETS: Preset[] = [nodeLayeredPreset, nodeModularPreset, phpLayeredPreset];
+const PRESETS: Preset[] = [
+  nodeLayeredPreset,
+  nodeModularPreset,
+  phpLayeredPreset,
+  pythonFastapiPreset,
+];
 
 export interface PresetInfo {
   id: string;
