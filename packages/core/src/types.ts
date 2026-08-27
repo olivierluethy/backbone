@@ -139,10 +139,14 @@ export interface Blueprint {
 }
 
 /** Target runtime for generation. */
-export type Runtime = "node" | "php";
+export type Runtime = "node" | "php" | "python";
 
-/** Architecture preset. */
-export type Architecture = "layered" | "modular";
+/**
+ * Architecture / framework preset. For Node this is a code layout (layered / modular); for
+ * Python it selects the web framework (fastapi / django). The runtime × architecture pair
+ * resolves to exactly one template set.
+ */
+export type Architecture = "layered" | "modular" | "fastapi" | "django";
 
 export interface GenerateOptions {
   runtime: Runtime;
