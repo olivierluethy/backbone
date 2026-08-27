@@ -33,6 +33,8 @@ export interface ColumnView {
   zod: string;
   knex: string; // a knex schema-builder statement fragment
   phpType: string;
+  /** Safe SQL default expression for additive NOT NULL column adds. */
+  defaultExpr: string;
 }
 
 export interface EntityView {
@@ -97,6 +99,29 @@ export function knexColumn(f: EntityField, dialect: SqlDialect): string {
   if (!f.nullable) base += ".notNullable()";
   else base += ".nullable()";
   return base;
+}
+
+/**
+ * A safe SQL default for a NOT NULL column added to an existing (possibly populated) table.
+ * Additive migrations use this so `ALTER TABLE ADD COLUMN` never fails on backfilled rows.
+ */
+export function knexDefault(f: EntityField): string {
+  switch (f.type) {
+    case "int":
+    case "float":
+      return "0";
+    case "boolean":
+      return "false";
+    case "enum":
+      return JSON.stringify(f.enumValues?.[0] ?? "");
+    case "json":
+      return '"{}"';
+    case "datetime":
+    case "string":
+    case "uuid":
+    default:
+      return '""';
+  }
 }
 
 export function tsType(f: EntityField): string {
@@ -179,6 +204,7 @@ function columnView(f: EntityField, byName: Map<string, Entity>): ColumnView {
     zod: zodExpr(f),
     knex: "", // filled per-dialect in entityView
     phpType: phpType(f),
+    defaultExpr: knexDefault(f),
   };
 }
 
