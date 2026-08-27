@@ -89,7 +89,7 @@ function loadInitial(): PersistedProject | null {
 }
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  const seed = useRef<PersistedProject | null>(loadInitial()).current;
+  const [seed] = useState<PersistedProject | null>(loadInitial);
 
   const [meta, setMeta] = useState<Meta | null>(null);
   const [frontendPath, setFrontendPath] = useState(seed?.frontendPath ?? "examples/demo-frontend");
@@ -234,6 +234,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         dialect,
       });
       setResult(res);
+      setTab("report");
       setStage(res.diff ? "regenerate" : "generate");
     } catch (e) {
       setGenError((e as Error).message);

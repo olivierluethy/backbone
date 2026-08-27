@@ -127,7 +127,8 @@ function directoryDiagram(tree: TreeNode[]): string {
 
   lines.push(`  subgraph root["project/"]`);
   lines.push("    direction TB");
-  walk(tree);
+  if (tree.length) walk(tree);
+  else lines.push(`    ${nextId()}["(no files yet)"]`);
   lines.push("  end");
   if (generated.length) lines.push(`  class ${generated.join(",")} gen;`);
   return lines.join("\n");
