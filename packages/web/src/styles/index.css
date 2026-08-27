@@ -133,6 +133,154 @@
     color: var(--text);
   }
 
+  /* Rendered Markdown file preview (§9.3) — a superset of .report-md with prose extras. */
+  .markdown-body {
+    font-size: 13.5px;
+    line-height: 21px;
+    color: var(--slate-200);
+    max-width: 78ch;
+  }
+  .markdown-body h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 4px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .markdown-body h2 {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 24px 0 8px;
+  }
+  .markdown-body h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 18px 0 6px;
+  }
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 16px 0 6px;
+  }
+  .markdown-body p {
+    margin: 0 0 10px;
+  }
+  .markdown-body a {
+    color: var(--info-500);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .markdown-body a:hover {
+    color: var(--brass-400);
+  }
+  .markdown-body strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .markdown-body em {
+    font-style: italic;
+  }
+  .markdown-body :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--brass-400);
+    background: var(--ink-900);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    padding: 1px 5px;
+  }
+  .markdown-body pre {
+    background: var(--ink-900);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    overflow-x: auto;
+    margin: 10px 0;
+  }
+  .markdown-body pre code {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 19px;
+    color: var(--paper-100);
+    background: transparent;
+    border: 0;
+    padding: 0;
+  }
+  .markdown-body ul,
+  .markdown-body ol {
+    margin: 0 0 10px;
+    padding-left: 22px;
+  }
+  .markdown-body ul {
+    list-style: disc;
+  }
+  .markdown-body ol {
+    list-style: decimal;
+  }
+  .markdown-body li {
+    margin: 2px 0;
+  }
+  .markdown-body li::marker {
+    color: var(--text-muted);
+  }
+  /* GFM task lists. */
+  .markdown-body li input[type="checkbox"] {
+    margin-right: 8px;
+    accent-color: var(--verd-500);
+  }
+  .markdown-body blockquote {
+    margin: 10px 0;
+    padding: 2px 14px;
+    border-left: 3px solid var(--brass-500);
+    color: var(--text-muted);
+  }
+  .markdown-body blockquote p {
+    margin: 4px 0;
+  }
+  .markdown-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 12.5px;
+    display: block;
+    overflow-x: auto;
+  }
+  .markdown-body th,
+  .markdown-body td {
+    border: 1px solid var(--line);
+    padding: 6px 10px;
+    text-align: left;
+  }
+  .markdown-body th {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: var(--ink-700);
+  }
+  .markdown-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--r-md);
+    border: 1px solid var(--line);
+    margin: 8px 0;
+  }
+  .markdown-body hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 20px 0;
+  }
+
   /* Transient toast entrance (§8.2). */
   .toast-in {
     animation: toast-rise 180ms ease;
