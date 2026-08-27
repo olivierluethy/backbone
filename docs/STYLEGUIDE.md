@@ -238,5 +238,53 @@ font the mono stack. Two toggle chips switch **Directory** vs **Entities**; a gh
 source" sits in the header.
 
 ### 6.6 Tabbed results
-Generate results use an underline tab row (Report · Files · Structure): active tab `--text` with a
-`2px --brass-500` bottom marker, inactive `--text-muted`. Tabs are buttons, keyboard-operable.
+Generate results use an underline tab row (Report · Files · Database · Structure): active tab
+`--text` with a `2px --brass-500` bottom marker, inactive `--text-muted`. Tabs are buttons,
+keyboard-operable.
+
+## 7. Iteration 3 — selectors, frontend badge, database view, pro explorer
+
+These extend the system above; they introduce **no new hues** — every colour still comes from the
+ink ramp + brass (detected) / verdigris (generated) / signal tokens.
+
+### 7.1 Dependent selectors (runtime → framework → architecture)
+Three segmented controls in one framed `--surface` panel. Selecting a runtime narrows the framework
+set; selecting a framework narrows the architecture set. Architecture options that are **not valid**
+for the framework are `disabled` at `opacity .3` with a `not-allowed` cursor and a `title` tooltip
+carrying the one-line reason from the capability matrix. Options that are valid but not yet
+generatable render in `--slate-300` (muted, still disabled) with an explanatory tooltip. The
+framework default architecture is marked with a trailing `★`. A one-line architecture description
+(mono eyebrow + sentence) sits under the panel.
+
+### 7.2 Detected-frontend badge
+The analyzer's detected frontend framework renders as a **brass detected badge**: an inline pill,
+`1px --brass-500/50` border on `--brass-050`, a measured `Frontend` eyebrow, a small drafting glyph
+(filled `--brass-500` circle when detected, hollow `--rule` when not), the framework name in
+`--brass-400` display, the version in mono `--brass-500`, and build-tool/language meta in
+`--text-muted`. Undetected → neutral `--surface` pill with a muted "Undetected" sentence. Brass is
+correct here: the frontend is the *detected* input.
+
+### 7.3 Database (ER) view
+A dedicated relational diagram, separate from the structure/directory diagram. Rendered as a Mermaid
+`erDiagram` on the drafting-grid ground in a framed, scrollable surface, themed with the same
+Mermaid overrides as §6.5. A **cardinality legend** precedes it: three mono chips `1:1 / 1:N / N:N`
+(`--brass-400` on `--ink-800`, `1px --rule`) with `--text-muted` labels. Relations draw with
+crow's-foot notation (`||--||`, `||--o{`, `}o--o{`); tables list columns with `PK`/`FK` markers.
+A ghost "Copy diagram source" sits in the header.
+
+### 7.4 VS Code–grade explorer
+Extends §6.2. The tree ↔ editor split gains a **draggable splitter** (`1px` hit-strip, hover
+`--brass-500/40`); tree width clamps `160–520px`. A **tab strip** (`--ink-800`, `1px --line` bottom)
+holds open files: single-click **previews** (transient tab, name italic), double-click **pins** a
+persistent tab; the active tab is `--ink-700` with a `2px --brass-500` bottom marker and a hover-in
+`×` close. A file may be opened **side by side** (Split action, or drag a tab to the right 40% — a
+`--brass-050/40` drop overlay with a `2px --brass-400` left edge shows the target); the split
+divider is draggable (`--line`, hover brass). An **editor zoom** control (− / `Npx` reset / +) sits
+in the toolbar; the code font-size/line-height scale from it (default tighter, `12px`). The editor
+stays read-only.
+
+### 7.5 Open in VS Code
+A ghost action (`1px --rule`, neutral bracket glyph — no external branding) at project level (result
+header + explorer toolbar) and per file (viewer header, compact). Disabled at `opacity .4` with a
+tooltip when the host `code` CLI is absent; a `vscode://file/…` deep link is the fallback. Transient
+status text in mono (`--verd-400` opening / `--warn-500` cli-missing / `--danger-500` error).
