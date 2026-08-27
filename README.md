@@ -14,8 +14,9 @@ analyze  →  Blueprint (review / edit)  →  generate  →  regenerate (additiv
 ```
 
 - **Deterministic, not generative.** Same frontend in → same backend out, byte for byte.
-- **Two runtimes.** Node.js (Express + TypeScript + Knex) and PHP (PDO), each in a
-  standardized layered structure, SQLite out of the box (MySQL configurable).
+- **Three runtimes, five targets.** Node.js (Express + TS + Knex — layered or modular), PHP
+  (PDO), and Python (FastAPI + SQLAlchemy + Alembic, or Django + DRF), each SQLite out of the
+  box (MySQL/Postgres configurable).
 - **Traceable.** Every Blueprint node records the frontend `file:line` it came from; a
   `GENERATION_REPORT.md` maps each requirement to the backend component it produced.
 - **Additive regeneration.** Change the frontend, regenerate: Backbone diffs the Blueprint,
@@ -39,10 +40,15 @@ pnpm build            # build the workspace packages
 pnpm --filter @backbone/web dev
 ```
 
-Open the printed URL, point it at `examples/demo-frontend`, and step through the pipeline:
-see the Blueprint as an ERD of drafting cards with relation connectors, toggle entities /
-fields / endpoints, follow source-ref links back into the frontend, pick a runtime +
-architecture, generate, and read the report. Regenerate to see the change set.
+Open the printed URL and step through the pipeline: **Browse…** to pick a frontend folder
+(or type a path), analyze, review the Blueprint as an ERD of drafting cards with relation
+connectors, toggle entities / fields / endpoints, follow source-ref links back into the
+frontend, pick a runtime + framework, and generate. Results come with a formatted status
+summary, a **VS Code–style file explorer** (open files with syntax highlighting, copy or
+download individual files, **Download project (.zip)** or a selection), a **Mermaid
+structure** view (entity ER + directory graph), and the generation report. The action button
+auto-labels **Generate** vs **Regenerate** based on the target; regenerating shows the
+additive change set.
 
 ### The CLI
 
@@ -54,8 +60,10 @@ pnpm bb analyze examples/demo-frontend --out blueprint.json
 pnpm bb review blueprint.json
 
 # Generate a backend
-pnpm bb generate examples/demo-frontend --runtime node --arch layered --out ./backend-node
-pnpm bb generate examples/demo-frontend --runtime php  --arch layered --out ./backend-php
+pnpm bb generate examples/demo-frontend --runtime node   --arch layered      --out ./backend-node
+pnpm bb generate examples/demo-frontend --runtime php    --arch layered      --out ./backend-php
+pnpm bb generate examples/demo-frontend --runtime python --framework fastapi --out ./backend-fastapi
+pnpm bb generate examples/demo-frontend --runtime python --framework django  --out ./backend-django
 
 # Regenerate additively after the frontend changes
 pnpm bb regenerate --out ./backend-node --frontend examples/demo-frontend
@@ -103,6 +111,10 @@ written **once** and never touched again. Migrations are additive.
 - **PHP · layered** — PDO, per-entity validators, consistent JSON errors with correct status
   codes, JWT auth (`firebase/php-jwt`), a `public/index.php` front controller, additive
   migrations, SQLite default.
+- **Python · FastAPI** — FastAPI + SQLAlchemy 2 + Alembic, Pydantic v2 validation (camelCase
+  aliases), JWT auth (PyJWT + bcrypt), additive Alembic revisions, SQLite default.
+- **Python · Django** — Django + DRF + SimpleJWT, model-derived migrations (`makemigrations`),
+  camelCase JSON, SQLite default.
 
 ---
 
