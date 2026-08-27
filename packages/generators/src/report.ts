@@ -1,5 +1,12 @@
-import { summarizeDiff, type Blueprint, type BlueprintDiff } from "@backbone/core";
+import {
+  ARCHITECTURE_LABELS,
+  FRAMEWORK_LABELS,
+  summarizeDiff,
+  type Blueprint,
+  type BlueprintDiff,
+} from "@backbone/core";
 import type { BlueprintView } from "./helpers.js";
+import type { Layout } from "./layout.js";
 import type { GenFile, MigrationPlan } from "./types.js";
 
 /**
@@ -11,15 +18,20 @@ export function buildReport(args: {
   view: BlueprintView;
   presetId: string;
   runtime: string;
+  framework: string;
   architecture: string;
+  layout: Layout;
   files: GenFile[];
   migrationFilename: string | null;
   plan: MigrationPlan;
   diff: BlueprintDiff | null;
   timestamp: string;
 }): string {
-  const { blueprint, view, presetId, runtime, architecture, files, migrationFilename, plan, diff, timestamp } = args;
+  const { blueprint, view, presetId, runtime, framework, architecture, layout, files, migrationFilename, plan, diff, timestamp } = args;
   const L: string[] = [];
+
+  const fwLabel = FRAMEWORK_LABELS[framework as keyof typeof FRAMEWORK_LABELS] ?? framework;
+  const archLabel = ARCHITECTURE_LABELS[architecture as keyof typeof ARCHITECTURE_LABELS] ?? architecture;
 
   L.push(`# Generation report`);
   L.push("");
@@ -27,8 +39,10 @@ export function buildReport(args: {
   L.push("");
   L.push(`| | |`);
   L.push(`|---|---|`);
+  L.push(`| Frontend | ${frontendLine(blueprint)} |`);
   L.push(`| Runtime | \`${runtime}\` |`);
-  L.push(`| Architecture | \`${architecture}\` |`);
+  L.push(`| Framework | ${fwLabel} (\`${framework}\`) |`);
+  L.push(`| Architecture | ${archLabel} (\`${architecture}\`) |`);
   L.push(`| Template set | \`${presetId}\` |`);
   L.push(`| Datastore | \`${view.dialect}\`${view.dialect === "sqlite" ? " (zero-setup default)" : ""} |`);
   L.push(`| Auth | ${view.hasAuth ? "JWT (register / login / me + guard)" : "none detected"} |`);
@@ -36,6 +50,18 @@ export function buildReport(args: {
   L.push(`| Endpoints | ${view.entities.reduce((n, e) => n + e.endpoints.length, 0)} |`);
   L.push(`| Files written | ${files.length}${migrationFilename ? " + 1 migration" : ""} |`);
   L.push(`| Generated at | ${timestamp} |`);
+  L.push("");
+
+  // --- Architecture layering ---
+  L.push(`## Architecture — ${layout.title}`);
+  L.push("");
+  L.push(`Dependency rule: ${layout.dependencyRule}.`);
+  L.push("");
+  L.push(`| Layer | Location | Responsibility |`);
+  L.push(`|---|---|---|`);
+  for (const layer of layout.layers) {
+    L.push(`| ${layer.name} | \`${layer.path}\` | ${layer.role} |`);
+  }
   L.push("");
 
   if (diff) {
@@ -113,4 +139,13 @@ export function buildReport(args: {
   L.push("");
 
   return L.join("\n") + "\n";
+}
+
+/** One-line summary of the detected frontend framework for the report table. */
+function frontendLine(bp: Blueprint): string {
+  const f = bp.frontend;
+  if (!f || !f.detected) return "undetected";
+  const version = f.version ? ` ${f.version}` : "";
+  const meta = f.meta ? ` (${f.meta})` : "";
+  return `${f.displayName}${version}${meta}`;
 }

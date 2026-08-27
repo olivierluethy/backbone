@@ -2,10 +2,19 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  ARCHITECTURE_LABELS,
+  architecturesForFramework,
+  defaultArchitectureFor,
+  defaultFrameworkFor,
+  FRAMEWORK_LABELS,
+  frameworksForRuntime,
   parseBlueprint,
+  RUNTIME_OF_FRAMEWORK,
   serializeBlueprint,
   summarizeDiff,
+  validateCombination,
   type Architecture,
+  type Framework,
   type Runtime,
 } from "@backbone/core";
 import { analyzeFrontend } from "@backbone/analyzer";
@@ -49,14 +58,19 @@ const HELP = `${ui.bold("bb")} — Backbone: deterministic frontend → backend 
 ${eyebrow("Usage")}
   bb analyze <frontendPath> [--out blueprint.json]
   bb review [blueprint.json]
-  bb generate <blueprint.json | frontendPath> --runtime <node|php|python> [--arch <layered|modular> | --framework <fastapi|django>] --out <dir> [--dialect sqlite|mysql]
-  bb regenerate --out <dir> [--frontend <path>] [--runtime … --framework …]
-  bb presets
+  bb generate <blueprint.json | frontendPath> [--runtime <node|php|python>]
+      [--framework <express|nestjs|fastify|laravel|symfony|php-plain|django|fastapi|flask>]
+      [--architecture <layered|clean|onion|monolithic|mvc|mvvm|microservices>]
+      --out <dir> [--dialect sqlite|mysql]
+  bb regenerate --out <dir> [--frontend <path>] [--framework … --architecture …]
+  bb combos            # the full capability matrix (valid combinations)
+  bb presets           # registered template sets
 
 ${eyebrow("Notes")}
-  Analysis and generation are deterministic — no AI at any step.
-  Regeneration is additive: it overwrites only the generated/ boundary and never
-  edits old migrations or your own code.`;
+  --framework implies its runtime; --architecture defaults to the framework's idiomatic
+  pattern. Invalid framework × architecture combinations are rejected against the matrix.
+  Analysis and generation are deterministic — no AI at any step. Regeneration is additive:
+  it overwrites only the generated/ boundary and never edits old migrations or your own code.`;
 
 function cmdAnalyze(args: Args): void {
   const frontend = args._[0];
@@ -75,18 +89,44 @@ function cmdReview(args: Args): void {
   printBlueprintSummary(bp);
 }
 
-/** `--framework` is an alias for `--arch` (Python's framework is the architecture slot). */
-function resolveArchitecture(args: Args, runtime: Runtime): Architecture {
-  const explicit = args.flags.framework ?? args.flags.arch;
-  if (typeof explicit === "string") return explicit as Architecture;
-  return (runtime === "python" ? "fastapi" : "layered") as Architecture;
+interface Target {
+  runtime: Runtime;
+  framework: Framework;
+  architecture: Architecture;
+}
+
+/**
+ * Resolve the (runtime, framework, architecture) triple from flags, filling defaults from the
+ * capability matrix and validating the combination. `--framework` implies its runtime, so
+ * `--framework fastify` alone selects Node. `--arch` is accepted as an alias for
+ * `--architecture`. Fails with a precise, matrix-aware message on any invalid combination.
+ */
+function resolveTarget(args: Args): Target {
+  const fwFlag = typeof args.flags.framework === "string" ? (args.flags.framework as Framework) : undefined;
+  const rtFlag = typeof args.flags.runtime === "string" ? (args.flags.runtime as Runtime) : undefined;
+  const archFlag =
+    typeof args.flags.architecture === "string"
+      ? (args.flags.architecture as Architecture)
+      : typeof args.flags.arch === "string"
+        ? (args.flags.arch as Architecture)
+        : undefined;
+
+  // Runtime: explicit, else inferred from the framework, else node.
+  const runtime: Runtime = rtFlag ?? (fwFlag ? RUNTIME_OF_FRAMEWORK[fwFlag] : undefined) ?? "node";
+  // Framework: explicit, else the runtime's idiomatic default.
+  const framework: Framework = fwFlag ?? defaultFrameworkFor(runtime);
+  // Architecture: explicit, else the framework's idiomatic default.
+  const architecture: Architecture = archFlag ?? defaultArchitectureFor(framework);
+
+  const err = validateCombination(runtime, framework, architecture);
+  if (err) fail(err + "\n  Run `bb combos` to see every valid runtime × framework × architecture.");
+  return { runtime, framework, architecture };
 }
 
 function cmdGenerate(args: Args): void {
   const src = args._[0];
   if (!src) fail("generate needs a blueprint.json or a frontend path.");
-  const runtime = String(args.flags.runtime ?? "node") as Runtime;
-  const architecture = resolveArchitecture(args, runtime);
+  const { runtime, framework, architecture } = resolveTarget(args);
   const outDir = args.flags.out;
   if (typeof outDir !== "string") fail("generate needs --out <dir>.");
   const dialect = args.flags.dialect === "mysql" ? "mysql" : "sqlite";
@@ -96,7 +136,7 @@ function cmdGenerate(args: Args): void {
       ? parseBlueprint(readFileSync(src, "utf8"))
       : analyzeFrontend(resolve(src));
 
-  const res = generateBackend(bp, { runtime, architecture, outDir: resolve(outDir), dialect });
+  const res = generateBackend(bp, { runtime, framework, architecture, outDir: resolve(outDir), dialect });
   reportGeneration(res);
 }
 
@@ -112,12 +152,11 @@ function cmdRegenerate(args: Args): void {
     fail(`cannot find the frontend to re-analyse. Pass --frontend <path>.`);
   }
   const bp = analyzeFrontend(resolve(frontend));
-  // Runtime/arch aren't stored in the lock; default to node/layered unless overridden.
-  const runtime = String(args.flags.runtime ?? "node") as Runtime;
-  const architecture = resolveArchitecture(args, runtime);
+  // Runtime/framework/arch aren't stored in the lock; default to the matrix unless overridden.
+  const { runtime, framework, architecture } = resolveTarget(args);
   const dialect = args.flags.dialect === "mysql" ? "mysql" : lock.datastore.dialect;
 
-  const res = generateBackend(bp, { runtime, architecture, outDir: resolve(outDir), dialect });
+  const res = generateBackend(bp, { runtime, framework, architecture, outDir: resolve(outDir), dialect });
   if (res.diff) {
     const lines = summarizeDiff(res.diff);
     console.log("");
@@ -130,10 +169,37 @@ function cmdRegenerate(args: Args): void {
 
 function cmdPresets(): void {
   console.log("");
-  console.log(eyebrow("Template sets"));
+  console.log(eyebrow("Registered template sets"));
   for (const p of listPresets()) {
-    console.log(`  ${ui.verd("▪")} ${ui.bold(p.id)} ${ui.muted(`(${p.runtime} / ${p.architecture})`)}`);
+    console.log(
+      `  ${ui.verd("▪")} ${ui.bold(p.id)} ${ui.muted(`(${p.runtime} / ${p.framework} / ${p.architecture})`)}`,
+    );
   }
+  console.log("");
+}
+
+/** Print the full capability matrix — every valid runtime × framework × architecture combo. */
+function cmdCombos(): void {
+  const registered = new Set(listPresets().map((p) => `${p.framework}/${p.architecture}`));
+  console.log("");
+  console.log(eyebrow("Capability matrix"));
+  console.log(ui.muted("  runtime → framework → architectures  (● generatable now, ○ offered)"));
+  for (const runtime of ["node", "php", "python"] as Runtime[]) {
+    console.log("");
+    console.log(`  ${ui.bold(runtime)}`);
+    for (const fw of frameworksForRuntime(runtime)) {
+      const archs = architecturesForFramework(fw)
+        .map((a) => {
+          const mark = registered.has(`${fw}/${a}`) ? ui.verd("●") : ui.muted("○");
+          const isDefault = a === defaultArchitectureFor(fw);
+          return `${mark} ${ARCHITECTURE_LABELS[a]}${isDefault ? ui.muted("*") : ""}`;
+        })
+        .join("  ");
+      console.log(`    ${ui.bold(FRAMEWORK_LABELS[fw])} ${ui.muted("—")} ${archs}`);
+    }
+  }
+  console.log("");
+  console.log(ui.muted("  * = framework default. Use --framework and --architecture to pick."));
   console.log("");
 }
 
@@ -173,6 +239,9 @@ function main(): void {
       return cmdRegenerate(rest);
     case "presets":
       return cmdPresets();
+    case "combos":
+    case "matrix":
+      return cmdCombos();
     case undefined:
     case "help":
     case "--help":

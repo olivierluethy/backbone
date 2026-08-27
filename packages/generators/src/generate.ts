@@ -6,10 +6,12 @@ import {
   type Architecture,
   type Blueprint,
   type BlueprintDiff,
+  type Framework,
   type GenerateOptions,
   type Runtime,
 } from "@backbone/core";
 import { buildBlueprintView } from "./helpers.js";
+import { resolveLayout } from "./layout.js";
 import { writeFiles, type WriteReport } from "./render.js";
 import { readLock, writeLock } from "./lock.js";
 import { planMigration } from "./migrations.js";
@@ -42,9 +44,10 @@ export function generateBackend(
 ): GenerateResult {
   const blueprint = canonicalizeBlueprint(blueprintInput);
   const dialect = options.dialect ?? blueprint.datastore.dialect;
-  const preset = getPreset(options.runtime, options.architecture);
+  const preset = getPreset(options.runtime, options.framework, options.architecture);
   const view = buildBlueprintView(blueprint, dialect);
-  const ctx: GenContext = { blueprint, view, options: { ...options, dialect } };
+  const layout = resolveLayout(options.architecture);
+  const ctx: GenContext = { blueprint, view, options: { ...options, dialect }, layout };
 
   mkdirSync(options.outDir, { recursive: true });
 
@@ -82,7 +85,9 @@ export function generateBackend(
     view,
     presetId: preset.id,
     runtime: options.runtime,
+    framework: options.framework,
     architecture: options.architecture,
+    layout,
     files,
     migrationFilename,
     plan,
@@ -110,4 +115,4 @@ function countMigrations(outDir: string): number {
 }
 
 export { getPreset, listPresets };
-export type { Preset, Runtime, Architecture };
+export type { Preset, Runtime, Framework, Architecture };
