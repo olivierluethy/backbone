@@ -191,3 +191,52 @@ Plain, precise, engineering register. Sentence case. Name things by what the dev
 controls: "Detected 4 entities", "Generate backend", "Regenerate — 2 additive migrations".
 Errors state what happened and the fix, in the tool's voice, no apology. Empty screens
 invite the next action. Never sell; describe.
+
+## 6. Iteration 2 — explorer, viewer, modal, badges, structure
+
+These extend the system above; they introduce no new hues. Every colour still comes from the
+ink ramp + brass/verdigris/signal tokens.
+
+### 6.1 Modal / dialog (folder picker)
+A centred panel over a `rgba(14,20,25,.72)` scrim (the `--ink-900` ground at 72%). Panel:
+`--surface-raised` background, `1px --rule` border, `--r-lg`, `--shadow-pop`, max-width `640px`,
+max-height `72vh`. Header carries a measured eyebrow + close control; a **breadcrumb** row uses
+mono `--text-muted` with `/` separators and a brass current segment; the body is a scrollable
+list of rows. A sticky footer holds the primary confirm ("Select this folder", brass) and a
+ghost cancel. Focus is trapped; `Esc` closes; the scrim is clickable to dismiss.
+
+### 6.2 File explorer (VS Code–style)
+Two panes inside one `1px --line` framed surface, split ~`260px` tree / flexible viewer.
+- **Tree**: rows `28px` tall, `--t-small`, indented `14px` per depth. A folder row shows a
+  disclosure chevron (rotates `90°` when open, `120ms`) and a **folder glyph** in `--brass-400`;
+  a file row shows a **file glyph** in `--text-muted` and, on the owned `generated/` boundary,
+  the filename in `--verd-400` to reinforce "generated". Hover lifts to `--ink-600`; the open
+  file row is `--ink-600` with a `2px --verd-500` left marker. A checkbox (appears on hover /
+  when any are checked) drives multi-select.
+- **Viewer**: header bar (`--ink-800`, `1px --line` bottom) with the mono file path on the left
+  and **Copy** + **Download this file** ghost icon-buttons on the right; body is the code block.
+
+### 6.3 Code viewer
+Mono `--t-mono`, `--ink-800` ground, a `44px` line-number gutter in `--slate-300` separated by a
+`1px --line` rule, `overflow:auto`, wide code scrolls within its own container. Syntax colours map
+to the palette — no rainbow: keyword `--brass-400`, string `--verd-400`, number `--info-500`,
+comment `--slate-300` italic, function/entity name `--paper-100`, punctuation `--slate-200`,
+operator `--brass-500`. The focused source line (popover) keeps its brass tint.
+
+### 6.4 Status badges (result summary)
+A wrapping row of **labelled badges**: each is a `--surface` chip, `1px --line`, `--r-md`,
+`6px 10px`, with an eyebrow label above a `--text` value. Semantic values keep their accent —
+mode `Regenerate` = brass, `Generate` = verd; auth = brass; "migration added" = verd, "none" =
+`--text-muted`. Date-times render locale-formatted (`27 Aug 2026, 18:14`) with the raw ISO in the
+`title`. The block leads with a one-line mode explanation in `--text-muted`.
+
+### 6.5 Structure diagram (Mermaid)
+Rendered on the drafting-grid ground inside a framed, scrollable surface. The Mermaid theme is
+overridden to the system: node fill `--ink-700`, node border `--rule`, entity/class titles
+`--brass-400`, edges `--rule`, edge labels (cardinality) `--text-muted`, text `--paper-100`,
+font the mono stack. Two toggle chips switch **Directory** vs **Entities**; a ghost "Copy Mermaid
+source" sits in the header.
+
+### 6.6 Tabbed results
+Generate results use an underline tab row (Report · Files · Structure): active tab `--text` with a
+`2px --brass-500` bottom marker, inactive `--text-muted`. Tabs are buttons, keyboard-operable.
