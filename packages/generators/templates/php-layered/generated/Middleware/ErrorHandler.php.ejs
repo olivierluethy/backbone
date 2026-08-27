@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Generated\Middleware;
+
+use App\Generated\Support\HttpException;
+use App\Generated\Support\Response;
+use App\Generated\Support\ValidationException;
+
+/** Central exception handler producing consistent JSON with the right status. Generated — do not edit. */
+final class ErrorHandler
+{
+    public static function run(callable $handler): void
+    {
+        try {
+            $handler();
+        } catch (ValidationException $e) {
+            Response::error($e->getMessage(), 422, $e->details);
+        } catch (HttpException $e) {
+            Response::error($e->getMessage(), $e->status);
+        } catch (\Throwable $e) {
+            error_log((string) $e);
+            Response::error('Internal server error', 500);
+        }
+    }
+}

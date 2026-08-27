@@ -1,0 +1,75 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Generated\Http;
+
+use App\Generated\Support\HttpException;
+
+/**
+ * Tiny deterministic router. Matches method + path (with `:param` segments) against the
+ * generated route table and dispatches to a controller action. Generated — do not edit.
+ */
+final class Router
+{
+    /** @param array<int, array{method: string, path: string, controller: string, action: string, auth: bool}> $routes */
+    public function __construct(private array $routes)
+    {
+    }
+
+    public function dispatch(string $method, string $path): void
+    {
+        $segments = $this->split($path);
+
+        foreach ($this->routes as $route) {
+            if (strcasecmp($route['method'], $method) !== 0) {
+                continue;
+            }
+            $params = $this->match($this->split($route['path']), $segments);
+            if ($params === null) {
+                continue;
+            }
+
+            $user = null;
+            if (!empty($route['auth'])) {
+                $user = \App\Generated\Middleware\AuthMiddleware::authenticate();
+            }
+
+            $controller = new $route['controller']();
+            $action = $route['action'];
+            $controller->$action($params, $user);
+            return;
+        }
+
+        throw new HttpException(404, "No route for {$method} {$path}");
+    }
+
+    /** @return array<int, string> */
+    private function split(string $path): array
+    {
+        return array_values(array_filter(explode('/', $path), static fn ($s) => $s !== ''));
+    }
+
+    /**
+     * Match a route pattern against request segments, capturing `:params`.
+     *
+     * @param array<int, string> $pattern
+     * @param array<int, string> $actual
+     * @return array<string, string>|null
+     */
+    private function match(array $pattern, array $actual): ?array
+    {
+        if (count($pattern) !== count($actual)) {
+            return null;
+        }
+        $params = [];
+        foreach ($pattern as $i => $seg) {
+            if (str_starts_with($seg, ':')) {
+                $params[substr($seg, 1)] = $actual[$i];
+            } elseif ($seg !== $actual[$i]) {
+                return null;
+            }
+        }
+        return $params;
+    }
+}

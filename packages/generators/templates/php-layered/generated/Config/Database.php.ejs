@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Generated\Config;
+
+use PDO;
+
+/** Shared PDO connection. SQLite by default; MySQL when DB_CLIENT=mysql. Generated — do not edit. */
+final class Database
+{
+    private static ?PDO $instance = null;
+
+    public static function pdo(): PDO
+    {
+        if (self::$instance instanceof PDO) {
+            return self::$instance;
+        }
+
+        $client = Env::get('DB_CLIENT', 'sqlite');
+        if ($client === 'mysql') {
+            $host = Env::get('DB_HOST', '127.0.0.1');
+            $port = Env::get('DB_PORT', '3306');
+            $name = Env::get('DB_NAME', 'backbone');
+            $dsn = "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4";
+            $pdo = new PDO($dsn, Env::get('DB_USER', 'root'), Env::get('DB_PASSWORD', ''));
+        } else {
+            $file = Env::get('DB_FILE', './data.sqlite');
+            $pdo = new PDO('sqlite:' . $file);
+            $pdo->exec('PRAGMA foreign_keys = ON');
+        }
+
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        self::$instance = $pdo;
+        return $pdo;
+    }
+}
