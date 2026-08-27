@@ -4,12 +4,13 @@ import {
   validateBlueprint,
   type Blueprint,
 } from "@backbone/core";
-import { api, type GenerateResult, type Meta } from "./api";
+import { api, type Capabilities, type GenerateResult, type Meta } from "./api";
 import { Rail, type Stage } from "./components/Rail";
 import { BlueprintCanvas } from "./components/BlueprintCanvas";
 import { AuthSummary, EndpointsTable } from "./components/EndpointsTable";
 import { GeneratePanel } from "./components/GeneratePanel";
 import { FolderPicker } from "./components/FolderPicker";
+import { FrontendBadge } from "./components/FrontendBadge";
 import { Button, Eyebrow } from "./components/primitives";
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
   const [stage, setStage] = useState<Stage>("analyze");
 
   const [runtime, setRuntimeState] = useState("node");
+  const [framework, setFrameworkState] = useState("express");
   const [architecture, setArchitecture] = useState("layered");
   const [dialect, setDialect] = useState("sqlite");
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -76,11 +78,27 @@ export default function App() {
     });
   }
 
-  /** Switch runtime and reconcile the architecture/framework to one that runtime supports. */
+  const caps = meta?.capabilities as Capabilities | undefined;
+
+  /** Switch runtime → pick that runtime's default framework → its default architecture. */
   function setRuntime(next: string) {
     setRuntimeState(next);
-    const archs = (meta?.presets ?? []).filter((p) => p.runtime === next).map((p) => p.architecture);
-    if (archs.length && !archs.includes(architecture)) setArchitecture(archs[0]);
+    if (!caps) return;
+    const fw = caps.defaultFrameworkByRuntime[next as keyof typeof caps.defaultFrameworkByRuntime];
+    if (fw) {
+      setFrameworkState(fw);
+      setArchitecture(caps.defaultArchitecture[fw]);
+    }
+  }
+
+  /** Switch framework and reconcile the architecture to one it supports (its default if not). */
+  function setFramework(next: string) {
+    setFrameworkState(next);
+    if (!caps) return;
+    const supported = caps.architecturesByFramework[next as keyof typeof caps.architecturesByFramework] ?? [];
+    if (!supported.includes(architecture as never)) {
+      setArchitecture(caps.defaultArchitecture[next as keyof typeof caps.defaultArchitecture]);
+    }
   }
 
   /** The blueprint actually sent to the generator: excluded fields stripped. */
@@ -102,7 +120,7 @@ export default function App() {
     setGenerating(true);
     setGenError(null);
     try {
-      const res = await api.generate({ blueprint: outgoing, runtime, architecture, dialect });
+      const res = await api.generate({ blueprint: outgoing, runtime, framework, architecture, dialect });
       setResult(res);
       setStage(res.diff ? "regenerate" : "generate");
     } catch (e) {
@@ -178,6 +196,7 @@ export default function App() {
 
           {blueprint && stage === "blueprint" && (
             <div className="space-y-8">
+              <FrontendBadge frontend={blueprint.frontend} />
               {issues.length > 0 && (
                 <div className="rounded-md border border-danger-500/50 bg-danger-050 p-3 text-small text-danger-500">
                   {issues.length} validation issue(s): {issues.map((i) => `${i.path}: ${i.message}`).join("; ")}
@@ -198,11 +217,14 @@ export default function App() {
           {blueprint && (stage === "generate" || stage === "regenerate") && (
             <GeneratePanel
               blueprint={outgoing ?? blueprint}
-              presets={meta?.presets ?? []}
+              capabilities={caps}
+              vscodeAvailable={!!meta?.vscode}
               runtime={runtime}
+              framework={framework}
               architecture={architecture}
               dialect={dialect}
               setRuntime={setRuntime}
+              setFramework={setFramework}
               setArchitecture={setArchitecture}
               setDialect={setDialect}
               onGenerate={generate}
@@ -261,6 +283,7 @@ function Summary({ blueprint }: { blueprint: Blueprint }) {
   return (
     <div className="space-y-4">
       <Eyebrow>Analysis</Eyebrow>
+      <FrontendBadge frontend={blueprint.frontend} />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           ["Entities", blueprint.entities.length],

@@ -1,34 +1,59 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type FileContent, type TreeNode } from "../api";
 import { CodeViewer } from "./CodeViewer";
+import { OpenInVscode } from "./OpenInVscode";
 import { Button } from "./primitives";
 
-/** VS Code–style explorer: nested tree on the left, code viewer on the right. */
-export function FileExplorer({ dir }: { dir: string }) {
+const MIN_TREE = 160;
+const MAX_TREE = 520;
+const MIN_FONT = 9;
+const MAX_FONT = 22;
+
+/**
+ * VS Code–grade explorer: a resizable tree, a tab strip with single-click preview and
+ * double-click-to-pin tabs, an optional side-by-side split editor (via the Split action or by
+ * dragging a tab to the right), editor zoom, per-file + project Copy / Download / Open-in-VS-Code.
+ * The editor is read-only — this is a viewer.
+ */
+export function FileExplorer({ dir, vscodeAvailable }: { dir: string; vscodeAvailable: boolean }) {
   const [tree, setTree] = useState<TreeNode[] | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [current, setCurrent] = useState<string | null>(null);
-  const [file, setFile] = useState<FileContent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Load the tree whenever the output dir changes.
+  // Tabs + editor state.
+  const [cache, setCache] = useState<Record<string, FileContent>>({});
+  const [tabs, setTabs] = useState<string[]>([]); // pinned (double-clicked) files
+  const [preview, setPreview] = useState<string | null>(null); // transient (single-click)
+  const [primary, setPrimary] = useState<string | null>(null); // focused file in the left pane
+  const [secondary, setSecondary] = useState<string | null>(null); // right split pane, null = single
+  const [fontSize, setFontSize] = useState(12);
+  const [treeWidth, setTreeWidth] = useState(248);
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const [dragOverSplit, setDragOverSplit] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+  // Load the tree whenever the output dir changes; reset editor state.
   useEffect(() => {
     let alive = true;
     setTree(null);
     setChecked(new Set());
-    setFile(null);
-    setCurrent(null);
+    setCache({});
+    setTabs([]);
+    setPreview(null);
+    setPrimary(null);
+    setSecondary(null);
     api
       .generatedTree(dir)
       .then(({ tree }) => {
         if (!alive) return;
         setTree(tree);
-        // Expand top-level dirs and open a sensible first file.
         setOpen(new Set(tree.filter((n) => n.type === "dir").map((n) => n.path)));
         const first = firstFile(tree);
-        if (first) openFile(first);
+        if (first) select(first, false);
       })
       .catch((e) => alive && setError((e as Error).message));
     return () => {
@@ -37,28 +62,74 @@ export function FileExplorer({ dir }: { dir: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dir]);
 
-  function openFile(path: string) {
-    setCurrent(path);
+  /** Fetch a file into the cache if not already present. */
+  function ensure(path: string) {
+    if (cache[path]) return;
     api
       .generatedFile(dir, path)
-      .then(setFile)
+      .then((f) => setCache((c) => ({ ...c, [path]: f })))
       .catch((e) => setError((e as Error).message));
   }
 
-  function toggleDir(path: string) {
-    setOpen((prev) => {
-      const next = new Set(prev);
-      next.has(path) ? next.delete(path) : next.add(path);
-      return next;
-    });
+  /** Single-click = preview (transient); double-click (pin=true) = persistent tab. */
+  function select(path: string, pin: boolean) {
+    ensure(path);
+    setPrimary(path);
+    if (pin) {
+      setTabs((t) => (t.includes(path) ? t : [...t, path]));
+      setPreview((p) => (p === path ? null : p));
+    } else if (!tabs.includes(path)) {
+      setPreview(path);
+    }
   }
 
-  function toggleCheck(path: string) {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      next.has(path) ? next.delete(path) : next.add(path);
-      return next;
-    });
+  function closeTab(path: string) {
+    setTabs((t) => t.filter((p) => p !== path));
+    if (preview === path) setPreview(null);
+    if (secondary === path) setSecondary(null);
+    if (primary === path) {
+      const remaining = [...tabs.filter((p) => p !== path), ...(preview && preview !== path ? [preview] : [])];
+      setPrimary(remaining[remaining.length - 1] ?? null);
+    }
+  }
+
+  function openInSplit(path: string) {
+    ensure(path);
+    setSecondary(path);
+  }
+
+  function zoom(delta: number) {
+    setFontSize((f) => Math.min(MAX_FONT, Math.max(MIN_FONT, f + delta)));
+  }
+
+  // --- Resizing (tree width + split ratio) via pointer drag ---
+  function startTreeDrag(e: React.PointerEvent) {
+    e.preventDefault();
+    const move = (ev: PointerEvent) => {
+      const left = containerRef.current?.getBoundingClientRect().left ?? 0;
+      setTreeWidth(Math.min(MAX_TREE, Math.max(MIN_TREE, ev.clientX - left)));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  function startSplitDrag(e: React.PointerEvent) {
+    e.preventDefault();
+    const move = (ev: PointerEvent) => {
+      const rect = editorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setSplitRatio(Math.min(0.8, Math.max(0.2, (ev.clientX - rect.left) / rect.width)));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   }
 
   async function downloadProject() {
@@ -85,9 +156,19 @@ export function FileExplorer({ dir }: { dir: string }) {
   }
 
   const fileCount = useMemo(() => (tree ? countFiles(tree) : 0), [tree]);
+  // Tab strip = pinned tabs, plus the transient preview shown last (italic) if not pinned.
+  const stripTabs = useMemo(() => {
+    const list = tabs.map((p) => ({ path: p, transient: false }));
+    if (preview && !tabs.includes(preview)) list.push({ path: preview, transient: true });
+    return list;
+  }, [tabs, preview]);
+
+  const primaryFile = primary ? cache[primary] : null;
+  const secondaryFile = secondary ? cache[secondary] : null;
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="generate" onClick={downloadProject} disabled={busy}>
           Download project (.zip)
@@ -100,15 +181,26 @@ export function FileExplorer({ dir }: { dir: string }) {
             clear selection
           </button>
         )}
-        <span className="ml-auto text-small text-text-muted">{fileCount} files</span>
+        <OpenInVscode dir={dir} available={vscodeAvailable} label="Open project in VS Code" />
+        <span className="ml-auto flex items-center gap-2 text-small text-text-muted">
+          <span>{fileCount} files</span>
+          <ZoomControl fontSize={fontSize} onZoom={zoom} onReset={() => setFontSize(12)} />
+        </span>
       </div>
 
       {error && (
         <div className="rounded-md border border-danger-500/50 bg-danger-050 p-3 text-small text-danger-500">{error}</div>
       )}
 
-      <div className="flex min-h-[420px] overflow-hidden rounded-md border border-line max-[900px]:flex-col">
-        <div className="w-[264px] shrink-0 overflow-auto border-r border-line bg-surface py-2 max-[900px]:max-h-56 max-[900px]:w-full max-[900px]:border-b max-[900px]:border-r-0">
+      <div
+        ref={containerRef}
+        className="flex min-h-[440px] overflow-hidden rounded-md border border-line max-[900px]:flex-col"
+      >
+        {/* Tree pane (resizable) */}
+        <div
+          className="shrink-0 overflow-auto border-r border-line bg-surface py-2 max-[900px]:max-h-56 max-[900px]:w-full max-[900px]:border-b max-[900px]:border-r-0"
+          style={{ width: treeWidth }}
+        >
           {!tree && <div className="px-3 py-2 text-small text-text-muted">Loading tree…</div>}
           {tree &&
             tree.map((n) => (
@@ -117,29 +209,206 @@ export function FileExplorer({ dir }: { dir: string }) {
                 node={n}
                 depth={0}
                 open={open}
-                current={current}
+                current={primary}
                 checked={checked}
-                onToggleDir={toggleDir}
-                onOpenFile={openFile}
-                onCheck={toggleCheck}
+                onToggleDir={(p) =>
+                  setOpen((prev) => {
+                    const next = new Set(prev);
+                    next.has(p) ? next.delete(p) : next.add(p);
+                    return next;
+                  })
+                }
+                onPreviewFile={(p) => select(p, false)}
+                onOpenFile={(p) => select(p, true)}
+                onCheck={(p) =>
+                  setChecked((prev) => {
+                    const next = new Set(prev);
+                    next.has(p) ? next.delete(p) : next.add(p);
+                    return next;
+                  })
+                }
               />
             ))}
         </div>
-        <div className="flex min-w-0 flex-1">
-          {file ? (
-            <CodeViewer
-              path={file.path}
-              language={file.language}
-              content={file.content}
-              onDownload={() => api.downloadFile(dir, file.path)}
-            />
-          ) : (
-            <div className="flex flex-1 items-center justify-center p-8 text-small text-text-muted">
-              Select a file to view it.
+
+        {/* Draggable splitter (tree ↔ editor) */}
+        <div
+          onPointerDown={startTreeDrag}
+          className="w-1 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-brass-500/40 max-[900px]:hidden"
+          title="Drag to resize"
+        />
+
+        {/* Editor area (tabs + one or two code panes) */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {stripTabs.length > 0 && (
+            <div className="flex items-stretch gap-0 overflow-x-auto border-b border-line bg-ink-800">
+              {stripTabs.map((t) => (
+                <TabButton
+                  key={t.path}
+                  path={t.path}
+                  transient={t.transient}
+                  active={primary === t.path}
+                  onClick={() => {
+                    ensure(t.path);
+                    setPrimary(t.path);
+                  }}
+                  onClose={() => closeTab(t.path)}
+                  onDragStartTab={(e) => e.dataTransfer.setData("text/bb-path", t.path)}
+                />
+              ))}
             </div>
           )}
+
+          <div
+            ref={editorRef}
+            className="relative flex min-h-0 flex-1"
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes("text/bb-path")) {
+                e.preventDefault();
+                const rect = editorRef.current?.getBoundingClientRect();
+                if (rect) setDragOverSplit(e.clientX - rect.left > rect.width * 0.6);
+              }
+            }}
+            onDragLeave={() => setDragOverSplit(false)}
+            onDrop={(e) => {
+              const path = e.dataTransfer.getData("text/bb-path");
+              setDragOverSplit(false);
+              if (path && e.clientX - (editorRef.current?.getBoundingClientRect().left ?? 0) > (editorRef.current?.clientWidth ?? 0) * 0.6) {
+                openInSplit(path);
+              }
+            }}
+          >
+            {primaryFile ? (
+              <div className="min-w-0 flex-1" style={secondary ? { flex: `0 0 ${splitRatio * 100}%` } : undefined}>
+                <CodeViewer
+                  path={primaryFile.path}
+                  language={primaryFile.language}
+                  content={primaryFile.content}
+                  fontSize={fontSize}
+                  onDownload={() => api.downloadFile(dir, primaryFile.path)}
+                  actions={
+                    <>
+                      {!secondary && (
+                        <MiniButton label="Split" title="Open beside" onClick={() => openInSplit(primaryFile.path)} />
+                      )}
+                      <OpenInVscode dir={dir} path={primaryFile.path} available={vscodeAvailable} label="VS Code" compact />
+                    </>
+                  }
+                />
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center p-8 text-small text-text-muted">
+                Single-click a file to preview · double-click to open a tab.
+              </div>
+            )}
+
+            {secondary && (
+              <>
+                <div
+                  onPointerDown={startSplitDrag}
+                  className="w-1 shrink-0 cursor-col-resize bg-line transition-colors hover:bg-brass-500/40"
+                  title="Drag to resize"
+                />
+                <div className="min-w-0 flex-1">
+                  {secondaryFile && (
+                    <CodeViewer
+                      path={secondaryFile.path}
+                      language={secondaryFile.language}
+                      content={secondaryFile.content}
+                      fontSize={fontSize}
+                      onDownload={() => api.downloadFile(dir, secondaryFile.path)}
+                      actions={
+                        <>
+                          <MiniButton label="Close split" title="Close the split pane" onClick={() => setSecondary(null)} />
+                          <OpenInVscode dir={dir} path={secondaryFile.path} available={vscodeAvailable} label="VS Code" compact />
+                        </>
+                      }
+                    />
+                  )}
+                </div>
+              </>
+            )}
+
+            {dragOverSplit && (
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-2/5 border-l-2 border-brass-400 bg-brass-050/40" />
+            )}
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ZoomControl({ fontSize, onZoom, onReset }: { fontSize: number; onZoom: (d: number) => void; onReset: () => void }) {
+  return (
+    <span className="inline-flex items-center overflow-hidden rounded-sm border border-rule">
+      <button className="px-1.5 py-0.5 text-text-muted hover:bg-ink-600 hover:text-text" onClick={() => onZoom(-1)} title="Zoom out">
+        −
+      </button>
+      <button
+        className="border-x border-rule px-1.5 py-0.5 text-mono text-text-muted hover:bg-ink-600 hover:text-text"
+        onClick={onReset}
+        title="Reset zoom"
+      >
+        {fontSize}px
+      </button>
+      <button className="px-1.5 py-0.5 text-text-muted hover:bg-ink-600 hover:text-text" onClick={() => onZoom(1)} title="Zoom in">
+        +
+      </button>
+    </span>
+  );
+}
+
+function MiniButton({ label, title, onClick }: { label: string; title?: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="rounded-sm border border-rule px-2 py-0.5 text-eyebrow font-semibold uppercase tracking-eyebrow text-text-muted transition-colors hover:bg-ink-600 hover:text-text"
+    >
+      {label}
+    </button>
+  );
+}
+
+function TabButton({
+  path,
+  transient,
+  active,
+  onClick,
+  onClose,
+  onDragStartTab,
+}: {
+  path: string;
+  transient: boolean;
+  active: boolean;
+  onClick: () => void;
+  onClose: () => void;
+  onDragStartTab: (e: React.DragEvent) => void;
+}) {
+  const name = path.split("/").pop() ?? path;
+  return (
+    <div
+      draggable
+      onDragStart={onDragStartTab}
+      onClick={onClick}
+      onDoubleClick={(e) => e.stopPropagation()}
+      className={`group/tab flex shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-3 py-1.5 text-mono ${
+        active ? "bg-ink-700 text-text shadow-[inset_0_-2px_0_var(--brass-500)]" : "text-text-muted hover:bg-ink-700"
+      }`}
+      title={path}
+    >
+      <span className={transient ? "italic" : ""}>{name}</span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="rounded-sm px-1 text-text-muted opacity-0 hover:text-danger-500 group-hover/tab:opacity-100"
+        title="Close"
+      >
+        ×
+      </button>
     </div>
   );
 }
@@ -151,6 +420,7 @@ function TreeRow({
   current,
   checked,
   onToggleDir,
+  onPreviewFile,
   onOpenFile,
   onCheck,
 }: {
@@ -160,6 +430,7 @@ function TreeRow({
   current: string | null;
   checked: Set<string>;
   onToggleDir: (p: string) => void;
+  onPreviewFile: (p: string) => void;
   onOpenFile: (p: string) => void;
   onCheck: (p: string) => void;
 }) {
@@ -188,6 +459,7 @@ function TreeRow({
               current={current}
               checked={checked}
               onToggleDir={onToggleDir}
+              onPreviewFile={onPreviewFile}
               onOpenFile={onOpenFile}
               onCheck={onCheck}
             />
@@ -216,8 +488,10 @@ function TreeRow({
         title="Select for download"
       />
       <button
-        onClick={() => onOpenFile(node.path)}
+        onClick={() => onPreviewFile(node.path)}
+        onDoubleClick={() => onOpenFile(node.path)}
         className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-small"
+        title="Single-click to preview · double-click to open a tab"
       >
         <FileGlyph />
         <span className={`truncate ${node.generated ? "text-verd-400" : "text-text"}`}>{node.name}</span>
@@ -247,7 +521,6 @@ function FileGlyph() {
 }
 
 function firstFile(nodes: TreeNode[]): string | null {
-  // Prefer a README at the top level, else the first file encountered depth-first.
   const readme = nodes.find((n) => n.type === "file" && /readme/i.test(n.name));
   if (readme) return readme.path;
   for (const n of nodes) {
