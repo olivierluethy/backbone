@@ -53,15 +53,27 @@ export interface GenContext {
   options: GenerateOptions;
 }
 
+/** Sequencing context for a migration, so chained schemes (e.g. Alembic) can link revisions. */
+export interface MigrationContext {
+  /** 1-based sequence number of the migration about to be written. */
+  sequence: number;
+  /** Zero-padded revision id of the previous migration, or null for the first. */
+  previousRevision: string | null;
+  /** Zero-padded revision id for this migration (matches the filename prefix). */
+  revision: string;
+}
+
 /** A pluggable template set for one runtime + architecture. */
 export interface Preset {
   id: string;
-  runtime: "node" | "php";
-  architecture: "layered" | "modular";
+  runtime: "node" | "php" | "python";
+  architecture: "layered" | "modular" | "fastapi" | "django";
   /** Directory name of this preset's EJS templates under `templates/`. */
   templateDir: string;
+  /** Migration file extension without the dot (default derived from runtime). */
+  migrationExtension?: string;
   /** Build every project file (excluding migrations). */
   build(ctx: GenContext): GenFile[];
   /** Render an additive migration file from a structured plan, or null if no work. */
-  migration(ctx: GenContext, plan: MigrationPlan): MigrationFile | null;
+  migration(ctx: GenContext, plan: MigrationPlan, migCtx?: MigrationContext): MigrationFile | null;
 }

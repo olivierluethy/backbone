@@ -59,11 +59,16 @@ export function generateBackend(
   const plan = planMigration(blueprint, prevLock, dialect);
   let migrationFilename: string | null = null;
   if (plan.hasWork) {
-    const mf = preset.migration(ctx, plan);
+    const count = countMigrations(options.outDir);
+    const sequence = count + 1;
+    const revision = String(sequence).padStart(4, "0");
+    const previousRevision = count > 0 ? String(count).padStart(4, "0") : null;
+    const mf = preset.migration(ctx, plan, { sequence, previousRevision, revision });
     if (mf) {
-      const seq = String(countMigrations(options.outDir) + 1).padStart(4, "0");
-      const ext = preset.runtime === "php" ? "php" : "ts";
-      migrationFilename = `${seq}_${plan.slug}.${ext}`;
+      const ext =
+        preset.migrationExtension ??
+        (preset.runtime === "php" ? "php" : preset.runtime === "python" ? "py" : "ts");
+      migrationFilename = `${revision}_${plan.slug}.${ext}`;
       const migDir = join(options.outDir, "migrations");
       mkdirSync(migDir, { recursive: true });
       writeFileSync(join(migDir, migrationFilename), mf.contents);
