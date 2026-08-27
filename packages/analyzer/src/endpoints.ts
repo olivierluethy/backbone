@@ -86,6 +86,10 @@ function interpretCall(call: CallExpression, root: string): RawEndpoint | null {
   if (raw === null) return null;
   const { path, hasTrailingParam } = normalizePath(raw);
   if (!path || path === "/") return null;
+  // Reject fully-dynamic paths (e.g. a generic client wrapper's `${base}${path}`): a real
+  // resource route needs at least one static segment.
+  const segs = path.split("/").filter(Boolean);
+  if (segs.length === 0 || segs.every((s) => s.startsWith(":"))) return null;
 
   const isAuth = AUTH_PATH.test(path);
   const operation = crudFor(method, hasTrailingParam);

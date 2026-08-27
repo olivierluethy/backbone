@@ -99,7 +99,30 @@ function buildOne(draft: EntityDraft, entityNames: Set<string>): Entity {
     });
   }
 
-  return { name: draft.name, table, fields, relations, generate: true, sourceRefs: draft.sourceRefs };
+  return {
+    name: draft.name,
+    table,
+    fields,
+    relations: dedupeRelations(relations),
+    generate: true,
+    sourceRefs: draft.sourceRefs,
+  };
+}
+
+/** Merge relations that describe the same edge (same kind, target and FK column). */
+function dedupeRelations(relations: Relation[]): Relation[] {
+  const seen = new Map<string, Relation>();
+  for (const r of relations) {
+    const key = `${r.kind}|${r.target}|${r.fk ?? ""}|${r.joinTable ?? ""}`;
+    const existing = seen.get(key);
+    if (existing) {
+      existing.sourceRefs.push(...r.sourceRefs);
+      existing.via = existing.via ?? r.via;
+    } else {
+      seen.set(key, { ...r });
+    }
+  }
+  return [...seen.values()];
 }
 
 function firstPk(props: RawProp[]): RawProp | undefined {

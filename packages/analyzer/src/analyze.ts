@@ -55,7 +55,6 @@ export function analyzeFrontend(frontendPath: string): Blueprint {
   let entities = buildEntities(drafts, entityNames);
 
   const roles = collectRoles(entities);
-  const endpoints = associateEndpoints(rawEndpoints, entities);
 
   // Auth is required if a login/register call exists or any call carries a token.
   const authRoutes = rawEndpoints.filter((e) => e.isAuthRoute);
@@ -64,6 +63,8 @@ export function analyzeFrontend(frontendPath: string): Blueprint {
   if (authRoutes.length > 0) {
     notes.push(`Auth detected from ${authRoutes.length} auth route(s); register/login/me generated.`);
   }
+
+  const endpoints = associateEndpoints(rawEndpoints, entities, authRequired);
 
   // Datastore is required only when a persisted operation exists.
   const persisted = endpoints.some(
@@ -86,7 +87,8 @@ export function analyzeFrontend(frontendPath: string): Blueprint {
 }
 
 /** Associate endpoints to entities by payload type, then by path segment. */
-function associateEndpoints(raw: RawEndpoint[], entities: Entity[]): Endpoint[] {
+function associateEndpoints(raw: RawEndpoint[], entities: Entity[], globalAuth: boolean): Endpoint[] {
+  const isMutation = (m: string) => m === "POST" || m === "PUT" || m === "PATCH" || m === "DELETE";
   const byName = new Map(entities.map((e) => [e.name, e]));
   const byTable = new Map(entities.map((e) => [e.table, e]));
   const bySingular = new Map(entities.map((e) => [toSnakeCase(e.name), e]));
@@ -107,7 +109,8 @@ function associateEndpoints(raw: RawEndpoint[], entities: Entity[]): Endpoint[] 
       entity,
       requestType: ep.requestType,
       responseType: ep.responseType,
-      auth: { required: ep.authProtected },
+      // A call's own token protects it; when the app has auth, mutations default protected.
+      auth: { required: ep.authProtected || (globalAuth && isMutation(ep.method)) },
       generate: true,
       sourceRefs: ep.sourceRefs,
     });
