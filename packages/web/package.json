@@ -8,7 +8,7 @@
     "dev": "concurrently -n server,web -c yellow,green \"pnpm server\" \"vite\"",
     "server": "tsx watch server/index.ts",
     "build": "vite build",
-    "preview": "vite preview --port 5177",
+    "preview": "vite preview --port 5410",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

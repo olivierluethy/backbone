@@ -13,7 +13,7 @@ import { generateBackend, listPresets } from "@backbone/generators";
  */
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..", "..");
-const PORT = Number(process.env.WEB_SERVER_PORT ?? 5178);
+const PORT = Number(process.env.WEB_SERVER_PORT ?? 5411);
 
 const app = express();
 app.use(cors());
