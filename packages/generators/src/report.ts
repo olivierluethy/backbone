@@ -141,6 +141,47 @@ export function buildReport(args: {
   return L.join("\n") + "\n";
 }
 
+/**
+ * Build docs/ARCHITECTURE.md — a per-project explanation of the chosen architectural pattern:
+ * its layers, where each lives, and the dependency rule that keeps the structure honest. Written
+ * for every generated backend so the architecture axis is tangible in the output, not just a flag.
+ */
+export function buildArchitectureDoc(args: {
+  framework: string;
+  architecture: string;
+  layout: Layout;
+}): string {
+  const { framework, architecture, layout } = args;
+  const fwLabel = FRAMEWORK_LABELS[framework as keyof typeof FRAMEWORK_LABELS] ?? framework;
+  const archLabel = ARCHITECTURE_LABELS[architecture as keyof typeof ARCHITECTURE_LABELS] ?? architecture;
+  const L: string[] = [];
+
+  L.push(`# Architecture — ${layout.title}`);
+  L.push("");
+  L.push(`This ${fwLabel} backend is organised using the **${archLabel}** pattern.`);
+  L.push("");
+  L.push(`**Dependency rule:** ${layout.dependencyRule}.`);
+  L.push("");
+  L.push(`## Layers`);
+  L.push("");
+  L.push(`The locations below name the pattern's canonical layers; a framework may use its own`);
+  L.push(`idiomatic folder names for the same roles (e.g. \`routers/\` for the routing layer).`);
+  L.push("");
+  L.push(`| Layer | Location | Responsibility |`);
+  L.push(`|---|---|---|`);
+  for (const layer of layout.layers) {
+    L.push(`| ${layer.name} | \`${layer.path}\` | ${layer.role} |`);
+  }
+  L.push("");
+  L.push(`## Ownership`);
+  L.push("");
+  L.push(`Code inside the generated boundary is owned by Backbone and re-emitted on every`);
+  L.push(`regenerate; the entrypoint and project configuration outside it are written once and`);
+  L.push(`are yours to extend. Keeping the layering above intact keeps regeneration safe.`);
+  L.push("");
+  return L.join("\n");
+}
+
 /** One-line summary of the detected frontend framework for the report table. */
 function frontendLine(bp: Blueprint): string {
   const f = bp.frontend;

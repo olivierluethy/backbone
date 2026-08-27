@@ -15,7 +15,7 @@ import { resolveLayout } from "./layout.js";
 import { writeFiles, type WriteReport } from "./render.js";
 import { readLock, writeLock } from "./lock.js";
 import { planMigration } from "./migrations.js";
-import { buildReport } from "./report.js";
+import { buildArchitectureDoc, buildReport } from "./report.js";
 import type { GenContext, Preset } from "./types.js";
 import { getPreset, listPresets } from "./presets/index.js";
 
@@ -95,6 +95,15 @@ export function generateBackend(
     timestamp,
   });
   writeFileSync(join(options.outDir, "GENERATION_REPORT.md"), report);
+
+  // A per-project architecture reference, so the chosen pattern's layering is documented in-repo.
+  const archDoc = buildArchitectureDoc({
+    framework: options.framework,
+    architecture: options.architecture,
+    layout,
+  });
+  mkdirSync(join(options.outDir, "docs"), { recursive: true });
+  writeFileSync(join(options.outDir, "docs", "ARCHITECTURE.md"), archDoc);
 
   return {
     outDir: options.outDir,
