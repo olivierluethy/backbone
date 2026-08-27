@@ -49,8 +49,8 @@ const HELP = `${ui.bold("bb")} — Backbone: deterministic frontend → backend 
 ${eyebrow("Usage")}
   bb analyze <frontendPath> [--out blueprint.json]
   bb review [blueprint.json]
-  bb generate <blueprint.json | frontendPath> --runtime <node|php> --arch <layered|modular> --out <dir> [--dialect sqlite|mysql]
-  bb regenerate --out <dir> [--frontend <path>]
+  bb generate <blueprint.json | frontendPath> --runtime <node|php|python> [--arch <layered|modular> | --framework <fastapi|django>] --out <dir> [--dialect sqlite|mysql]
+  bb regenerate --out <dir> [--frontend <path>] [--runtime … --framework …]
   bb presets
 
 ${eyebrow("Notes")}
@@ -75,11 +75,18 @@ function cmdReview(args: Args): void {
   printBlueprintSummary(bp);
 }
 
+/** `--framework` is an alias for `--arch` (Python's framework is the architecture slot). */
+function resolveArchitecture(args: Args, runtime: Runtime): Architecture {
+  const explicit = args.flags.framework ?? args.flags.arch;
+  if (typeof explicit === "string") return explicit as Architecture;
+  return (runtime === "python" ? "fastapi" : "layered") as Architecture;
+}
+
 function cmdGenerate(args: Args): void {
   const src = args._[0];
   if (!src) fail("generate needs a blueprint.json or a frontend path.");
   const runtime = String(args.flags.runtime ?? "node") as Runtime;
-  const architecture = String(args.flags.arch ?? "layered") as Architecture;
+  const architecture = resolveArchitecture(args, runtime);
   const outDir = args.flags.out;
   if (typeof outDir !== "string") fail("generate needs --out <dir>.");
   const dialect = args.flags.dialect === "mysql" ? "mysql" : "sqlite";
@@ -107,7 +114,7 @@ function cmdRegenerate(args: Args): void {
   const bp = analyzeFrontend(resolve(frontend));
   // Runtime/arch aren't stored in the lock; default to node/layered unless overridden.
   const runtime = String(args.flags.runtime ?? "node") as Runtime;
-  const architecture = String(args.flags.arch ?? "layered") as Architecture;
+  const architecture = resolveArchitecture(args, runtime);
   const dialect = args.flags.dialect === "mysql" ? "mysql" : lock.datastore.dialect;
 
   const res = generateBackend(bp, { runtime, architecture, outDir: resolve(outDir), dialect });
