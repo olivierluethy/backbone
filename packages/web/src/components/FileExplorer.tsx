@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type FileContent, type TreeNode } from "../api";
 import { CodeViewer } from "./CodeViewer";
+import { FileIcon } from "./FileIcon";
 import { OpenInVscode } from "./OpenInVscode";
 import { Button } from "./primitives";
 
@@ -398,6 +399,7 @@ function TabButton({
       }`}
       title={path}
     >
+      <FileIcon name={name} size={13} />
       <span className={transient ? "italic" : ""}>{name}</span>
       <button
         onClick={(e) => {
@@ -493,7 +495,7 @@ function TreeRow({
         className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-small"
         title="Single-click to preview · double-click to open a tab"
       >
-        <FileGlyph />
+        <FileIcon name={node.name} />
         <span className={`truncate ${node.generated ? "text-verd-400" : "text-text"}`}>{node.name}</span>
       </button>
     </div>
@@ -511,15 +513,6 @@ function FolderGlyph() {
     </svg>
   );
 }
-function FileGlyph() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" className="shrink-0 text-text-muted">
-      <path d="M4 1.5h5L13 5.5V14a.5.5 0 0 1-.5.5h-8A.5.5 0 0 1 4 14z" fill="currentColor" opacity="0.5" />
-      <path d="M9 1.5V5a.5.5 0 0 0 .5.5H13" stroke="var(--ink-800)" strokeWidth="1" fill="none" />
-    </svg>
-  );
-}
-
 function firstFile(nodes: TreeNode[]): string | null {
   const readme = nodes.find((n) => n.type === "file" && /readme/i.test(n.name));
   if (readme) return readme.path;
