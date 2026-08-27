@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { tableName, type Blueprint, type Entity, type Relation } from "@backbone/core";
 import { renderMermaid } from "./mermaid";
 import { Button, Eyebrow } from "./primitives";
+import { DiagramCanvas } from "./DiagramCanvas";
 
 /**
  * The dedicated Database view — a relational / ER diagram of the schema Backbone would create,
@@ -54,10 +55,7 @@ export function DatabaseView({ blueprint }: { blueprint: Blueprint }) {
           {copied ? "Copied" : "Copy diagram source"}
         </Button>
       </div>
-      <div
-        className="drafting-grid overflow-auto rounded-md border border-line p-4 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-none"
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
+      <DiagramCanvas svg={svg} ariaLabel="Database schema (ER) diagram" />
     </div>
   );
 }

@@ -7,7 +7,7 @@ import mermaid from "mermaid";
  */
 
 /** Read a design token's concrete value so Mermaid stays on-palette. */
-function token(name: string): string {
+export function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#000";
 }
 
@@ -20,6 +20,9 @@ export function ensureMermaid(): void {
     securityLevel: "loose",
     theme: "base",
     fontFamily: mono,
+    // Compact spacing so structure/directory diagrams stay space-efficient (§8.6).
+    flowchart: { nodeSpacing: 22, rankSpacing: 30, padding: 6, useMaxWidth: false },
+    er: { useMaxWidth: false, entityPadding: 8 },
     themeVariables: {
       background: token("--ink-800"),
       primaryColor: token("--ink-700"),
