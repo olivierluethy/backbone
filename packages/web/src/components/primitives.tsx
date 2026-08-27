@@ -12,7 +12,7 @@ export function Eyebrow({ children, count }: { children: ReactNode; count?: numb
   );
 }
 
-type Variant = "primary" | "generate" | "ghost" | "danger";
+type Variant = "primary" | "generate" | "ghost" | "danger" | "danger-solid";
 
 export function Button({
   variant = "ghost",
@@ -27,6 +27,7 @@ export function Button({
     generate: "bg-verd-500 text-ink-900 hover:bg-verd-400 active:bg-verd-600",
     ghost: "border border-rule text-text hover:bg-ink-600",
     danger: "border border-danger-500 text-danger-500 hover:bg-danger-050",
+    "danger-solid": "bg-danger-500 text-ink-900 hover:opacity-90 active:opacity-100",
   };
   return (
     <button className={`${base} ${styles[variant]} ${className}`} {...rest}>

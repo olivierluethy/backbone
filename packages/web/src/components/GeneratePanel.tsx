@@ -8,13 +8,15 @@ import {
   type Framework,
   type Runtime,
 } from "@backbone/core";
-import { api, type Capabilities, type GenerateResult, type TargetStatus } from "../api";
+import { api, type TargetStatus } from "../api";
 import { Button, Eyebrow } from "./primitives";
 import { StatusBadges } from "./StatusBadges";
 import { FileExplorer } from "./FileExplorer";
 import { StructureView } from "./StructureView";
 import { DatabaseView } from "./DatabaseView";
 import { OpenInVscode } from "./OpenInVscode";
+import { useProject } from "../store/ProjectContext";
+import type { ResultTab } from "../store/persistence";
 
 /** A labelled segmented control. Options may be disabled with an explanatory tooltip. */
 function Segmented<T extends string>({
@@ -54,45 +56,33 @@ function Segmented<T extends string>({
   );
 }
 
-type Tab = "report" | "files" | "database" | "structure";
-
 export function GeneratePanel({
   blueprint,
-  capabilities,
   vscodeAvailable,
-  runtime,
-  framework,
-  architecture,
-  dialect,
-  setRuntime,
-  setFramework,
-  setArchitecture,
-  setDialect,
   onGenerate,
   generating,
-  result,
-  error,
 }: {
   blueprint: Blueprint;
-  capabilities?: Capabilities;
   vscodeAvailable: boolean;
-  runtime: string;
-  framework: string;
-  architecture: string;
-  dialect: string;
-  setRuntime: (v: string) => void;
-  setFramework: (v: string) => void;
-  setArchitecture: (v: string) => void;
-  setDialect: (v: string) => void;
   onGenerate: () => void;
   generating: boolean;
-  result: GenerateResult | null;
-  error: string | null;
 }) {
+  const {
+    caps,
+    runtime,
+    framework,
+    architecture,
+    dialect,
+    setRuntime,
+    setFramework,
+    setArchitecture,
+    setDialect,
+    result,
+    genError: error,
+    tab,
+    setTab,
+  } = useProject();
   const [status, setStatus] = useState<TargetStatus | null>(null);
-  const [tab, setTab] = useState<Tab>("report");
-
-  const caps = capabilities;
   const runtimes = caps?.runtimes ?? (["node", "php", "python"] as Runtime[]);
   const frameworksForRuntime = caps?.frameworksByRuntime?.[runtime as Runtime] ?? [];
   const fwCaps = caps?.frameworks?.[framework as Framework];
@@ -113,10 +103,6 @@ export function GeneratePanel({
       alive = false;
     };
   }, [runtime, framework, architecture, result]);
-
-  useEffect(() => {
-    if (result) setTab("report");
-  }, [result]);
 
   const willRegenerate = status?.mode === "regenerate";
   const diffLines = result?.diff ? summarizeDiff(result.diff as BlueprintDiff) : [];
@@ -258,7 +244,7 @@ export function GeneratePanel({
 
           {/* Tabbed results */}
           <div className="flex gap-1 border-b border-line">
-            {(["report", "files", "database", "structure"] as Tab[]).map((t) => (
+            {(["report", "files", "database", "structure"] as ResultTab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}

@@ -1,177 +1,44 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  serializeBlueprint,
-  validateBlueprint,
-  type Blueprint,
-} from "@backbone/core";
-import { api, type Capabilities, type GenerateResult, type Meta } from "./api";
-import { Rail, type Stage } from "./components/Rail";
+import { useState } from "react";
+import type { Blueprint } from "@backbone/core";
+import { Rail } from "./components/Rail";
 import { BlueprintCanvas } from "./components/BlueprintCanvas";
 import { AuthSummary, EndpointsTable } from "./components/EndpointsTable";
 import { GeneratePanel } from "./components/GeneratePanel";
 import { FolderPicker } from "./components/FolderPicker";
 import { FrontendBadge } from "./components/FrontendBadge";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { Button, Eyebrow } from "./components/primitives";
+import { useProject } from "./store/ProjectContext";
 
 export default function App() {
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [frontendPath, setFrontendPath] = useState("examples/demo-frontend");
-  const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
-  const [excluded, setExcluded] = useState<Set<string>>(new Set());
-  const [stage, setStage] = useState<Stage>("analyze");
+  const {
+    meta,
+    frontendPath,
+    setFrontendPath,
+    blueprint,
+    excluded,
+    stage,
+    setStage,
+    analyzing,
+    analyzeError,
+    generating,
+    result,
+    outgoing,
+    issues,
+    reached,
+    root,
+    hasProjectData,
+    analyze,
+    generate,
+    download,
+    toggleEntity,
+    toggleEndpoint,
+    toggleField,
+    clearProject,
+  } = useProject();
 
-  const [runtime, setRuntimeState] = useState("node");
-  const [framework, setFrameworkState] = useState("express");
-  const [architecture, setArchitecture] = useState("layered");
-  const [dialect, setDialect] = useState("sqlite");
   const [pickerOpen, setPickerOpen] = useState(false);
-
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
-  const [result, setResult] = useState<GenerateResult | null>(null);
-
-  useEffect(() => {
-    api.meta().then(setMeta).catch(() => setMeta(null));
-  }, []);
-
-  const reached: Record<Stage, boolean> = {
-    analyze: true,
-    blueprint: !!blueprint,
-    generate: !!blueprint,
-    regenerate: !!result,
-  };
-
-  async function analyze() {
-    setAnalyzing(true);
-    setAnalyzeError(null);
-    try {
-      const { blueprint: bp } = await api.analyze(frontendPath);
-      setBlueprint(bp);
-      setExcluded(new Set());
-      setResult(null);
-      setStage("blueprint");
-    } catch (e) {
-      setAnalyzeError((e as Error).message);
-    } finally {
-      setAnalyzing(false);
-    }
-  }
-
-  function toggleEntity(name: string, on: boolean) {
-    setBlueprint((bp) =>
-      bp ? { ...bp, entities: bp.entities.map((e) => (e.name === name ? { ...e, generate: on } : e)) } : bp,
-    );
-  }
-  function toggleEndpoint(index: number, on: boolean) {
-    setBlueprint((bp) =>
-      bp ? { ...bp, endpoints: bp.endpoints.map((ep, i) => (i === index ? { ...ep, generate: on } : ep)) } : bp,
-    );
-  }
-  function toggleField(key: string, on: boolean) {
-    setExcluded((prev) => {
-      const next = new Set(prev);
-      if (on) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  const caps = meta?.capabilities as Capabilities | undefined;
-
-  /**
-   * Switch runtime → pick that runtime's default framework → its default architecture. The
-   * framework is ALWAYS reconciled so runtime and framework can never desync (a leftover mismatch
-   * like php+express is what produced "express is not a PHP framework"). Falls back to the first
-   * framework of the runtime if the capability metadata isn't loaded yet.
-   */
-  function setRuntime(next: string) {
-    setRuntimeState(next);
-    if (!caps) return;
-    const fw =
-      caps.defaultFrameworkByRuntime[next as keyof typeof caps.defaultFrameworkByRuntime] ??
-      caps.frameworksByRuntime[next as keyof typeof caps.frameworksByRuntime]?.[0];
-    if (fw) {
-      setFrameworkState(fw);
-      setArchitecture(caps.defaultArchitecture[fw]);
-    }
-  }
-
-  /**
-   * Switch framework (the authoritative axis). Runtime follows the framework's owning runtime, and
-   * the architecture is reconciled to one the framework supports (its default if not).
-   */
-  function setFramework(next: string) {
-    setFrameworkState(next);
-    if (!caps) return;
-    const owningRuntime = caps.runtimeOfFramework[next as keyof typeof caps.runtimeOfFramework];
-    if (owningRuntime) setRuntimeState(owningRuntime);
-    const supported = caps.architecturesByFramework[next as keyof typeof caps.architecturesByFramework] ?? [];
-    if (!supported.includes(architecture as never)) {
-      setArchitecture(caps.defaultArchitecture[next as keyof typeof caps.defaultArchitecture]);
-    }
-  }
-
-  // Self-heal any runtime/framework desync once capabilities are known (e.g. a runtime switch that
-  // happened before meta loaded). The framework wins; runtime is corrected to its owning runtime.
-  useEffect(() => {
-    if (!caps) return;
-    const owning = caps.runtimeOfFramework[framework as keyof typeof caps.runtimeOfFramework];
-    if (owning && owning !== runtime) setRuntimeState(owning);
-  }, [caps, framework, runtime]);
-
-  /** The blueprint actually sent to the generator: excluded fields stripped. */
-  const outgoing = useMemo<Blueprint | null>(() => {
-    if (!blueprint) return null;
-    return {
-      ...blueprint,
-      entities: blueprint.entities.map((e) => ({
-        ...e,
-        fields: e.fields.filter((f) => !excluded.has(`${e.name}.${f.name}`)),
-      })),
-    };
-  }, [blueprint, excluded]);
-
-  const issues = useMemo(() => (outgoing ? validateBlueprint(outgoing) : []), [outgoing]);
-
-  async function generate() {
-    if (!outgoing) return;
-    setGenerating(true);
-    setGenError(null);
-    try {
-      // The framework decides the runtime — send the derived one so a transient selector desync
-      // can never reach the server as an invalid runtime×framework pair.
-      const effectiveRuntime =
-        caps?.runtimeOfFramework[framework as keyof typeof caps.runtimeOfFramework] ?? runtime;
-      const res = await api.generate({
-        blueprint: outgoing,
-        runtime: effectiveRuntime,
-        framework,
-        architecture,
-        dialect,
-      });
-      setResult(res);
-      setStage(res.diff ? "regenerate" : "generate");
-    } catch (e) {
-      setGenError((e as Error).message);
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  function download() {
-    if (!outgoing) return;
-    const blob = new Blob([serializeBlueprint(outgoing)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "blueprint.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  const root = blueprint?.meta.frontendPath ?? frontendPath;
+  const [confirmClear, setConfirmClear] = useState(false);
 
   return (
     <div className="flex h-full max-[820px]:flex-col">
@@ -211,6 +78,11 @@ export default function App() {
               </Button>
             </>
           )}
+          {hasProjectData && (
+            <Button variant="danger" onClick={() => setConfirmClear(true)} title="Remove this project's saved state">
+              Clear project data
+            </Button>
+          )}
         </header>
 
         <main className="min-w-0 flex-1 overflow-auto px-6 py-6">
@@ -247,20 +119,9 @@ export default function App() {
           {blueprint && (stage === "generate" || stage === "regenerate") && (
             <GeneratePanel
               blueprint={outgoing ?? blueprint}
-              capabilities={caps}
               vscodeAvailable={!!meta?.vscode}
-              runtime={runtime}
-              framework={framework}
-              architecture={architecture}
-              dialect={dialect}
-              setRuntime={setRuntime}
-              setFramework={setFramework}
-              setArchitecture={setArchitecture}
-              setDialect={setDialect}
               onGenerate={generate}
               generating={generating}
-              result={result}
-              error={genError}
             />
           )}
         </main>
@@ -274,6 +135,19 @@ export default function App() {
           setPickerOpen(false);
         }}
         onClose={() => setPickerOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="Clear project data"
+        message="This removes the saved state for this project from your browser. Generated files on disk are not touched. This cannot be undone."
+        bullets={["Blueprint", "Endpoints", "Database schema", "Directory / structure", "Change set"]}
+        confirmLabel="Clear project data"
+        onConfirm={() => {
+          clearProject();
+          setConfirmClear(false);
+        }}
+        onClose={() => setConfirmClear(false)}
       />
     </div>
   );
