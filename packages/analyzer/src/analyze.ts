@@ -10,6 +10,7 @@ import {
   type Entity,
 } from "@backbone/core";
 import { loadFrontend } from "./project.js";
+import { detectFrontend } from "./frontend.js";
 import { collectDeclarations, draftEntity } from "./entities.js";
 import { collectEndpoints, type RawEndpoint } from "./endpoints.js";
 import { buildEntities } from "./relations.js";
@@ -72,6 +73,14 @@ export function analyzeFrontend(frontendPath: string): Blueprint {
   );
   const datastoreRequired = persisted || entities.length > 0;
 
+  // Deterministic frontend-framework detection (package.json deps + source signals).
+  const frontend = detectFrontend(root);
+  if (frontend.detected) {
+    notes.push(`Frontend framework: ${frontend.displayName}${frontend.version ? ` ${frontend.version}` : ""}.`);
+  } else {
+    notes.push("Frontend framework undetected (no conclusive dependency or source signal).");
+  }
+
   let bp: Blueprint = {
     ...emptyBlueprint(root),
     meta: { frontendPath: root, analyzer: ANALYZER_VERSION },
@@ -79,6 +88,7 @@ export function analyzeFrontend(frontendPath: string): Blueprint {
     endpoints,
     auth: { required: authRequired, roles },
     datastore: { required: datastoreRequired, dialect: "sqlite" },
+    frontend,
     notes: [...notes, ...describeCoverage(entities, endpoints)],
   };
 
