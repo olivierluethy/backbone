@@ -197,6 +197,16 @@ export function GeneratePanel({
         </p>
       )}
 
+      {status?.runtimeSwitch && canGenerate && (
+        <p className="mt-1 text-small text-warn-500">
+          This target was last generated as{" "}
+          <span className="mono">
+            {status.runtimeSwitch.runtime}/{status.runtimeSwitch.framework}
+          </span>
+          . Regenerating will switch it to {runtime}/{framework} and remove the previous runtime's files.
+        </p>
+      )}
+
       {!canGenerate && (
         <p className="mt-2 text-small text-warn-500">
           {selectedArch?.label} is offered for {fwCaps?.label ?? framework} but not generatable in this
