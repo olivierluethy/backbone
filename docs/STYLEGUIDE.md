@@ -1,0 +1,193 @@
+# Backbone — Visual Styleguide
+
+> Single source of truth for the Backbone web UI. Every new surface must look like it
+> was always part of the product. Colours and type below are fixed; do not restyle on
+> the side.
+
+Backbone drafts a backend from a frontend, deterministically. Its world is **technical
+drafting and structural engineering** — blueprints, drafting instruments, measured rules.
+Determinism reads as *precision*, not fuzziness. The UI is a drafting table, not a chat.
+
+---
+
+## 1. Design tokens
+
+All tokens live as CSS custom properties on `:root` in `packages/web/src/styles/tokens.css`
+and are surfaced to Tailwind via `theme.extend`. Never hard-code a hex outside the token file.
+
+### 1.1 Colour
+
+Graphite-ink base (deliberately **not** near-black), a **brass / signal-amber** primary that
+marks everything *detected from the frontend*, and a **verdigris teal** that marks everything
+*generated into the backend*. The two accents are semantic, not decorative.
+
+| Token | Hex | Role |
+|-------|-----|------|
+| `--ink-900` | `#0E1419` | App background (graphite ink) |
+| `--ink-800` | `#121A21` | Sunken wells, canvas ground |
+| `--ink-700` | `#161F27` | Surface / cards |
+| `--ink-600` | `#1C2833` | Raised surface, popovers |
+| `--ink-500` | `#243039` | Hairlines, grid lines, dividers |
+| `--ink-400` | `#33424E` | Strong border, drafting rules |
+| `--slate-300` | `#8497A6` | Muted / secondary text |
+| `--slate-200` | `#AEBECB` | Body text on dark |
+| `--paper-100` | `#E8EEF2` | Primary text (near-white, cool) |
+| `--brass-600` | `#C8863A` | Detected accent, pressed |
+| `--brass-500` | `#E3A44C` | **Detected-from-frontend** (primary accent) |
+| `--brass-400` | `#EEBE77` | Detected accent, hover/light |
+| `--brass-050` | `#2A2013` | Detected accent tint (fills, chips) |
+| `--verd-600` | `#3E9186` | Generated accent, pressed |
+| `--verd-500` | `#4FB0A5` | **Generated-into-backend** (secondary accent) |
+| `--verd-400` | `#77C7BD` | Generated accent, hover/light |
+| `--verd-050` | `#12211F` | Generated accent tint |
+| `--danger-500` | `#D9634E` | Errors, destructive, removed-in-diff |
+| `--danger-050` | `#251510` | Danger tint |
+| `--warn-500` | `#D9A441` | Warnings (reuses brass family, higher chroma) |
+| `--info-500` | `#5B93C4` | Neutral info, links |
+
+Semantic aliases (use these in components, not the raw ramp):
+
+| Alias | Maps to | Meaning |
+|-------|---------|---------|
+| `--bg` | `--ink-900` | Page |
+| `--surface` | `--ink-700` | Card / panel |
+| `--surface-raised` | `--ink-600` | Popover / menu |
+| `--line` | `--ink-500` | Hairline divider |
+| `--rule` | `--ink-400` | Measured drafting rule |
+| `--text` | `--paper-100` | Primary text |
+| `--text-muted` | `--slate-300` | Secondary text |
+| `--detected` | `--brass-500` | Anything derived from the frontend |
+| `--generated` | `--verd-500` | Anything emitted into the backend |
+
+**Diff palette** (regeneration view): added → `--verd-500`, changed → `--brass-500`,
+removed → `--danger-500`, unchanged → `--slate-300`.
+
+Light mode is **not** supported. This is a dark, single-theme tool.
+
+### 1.2 Typography
+
+Three deliberate roles. The IBM Plex superfamily carries the engineering identity; Space
+Grotesk gives display type its character; mono carries every source-ref, path, and datum.
+
+| Role | Family | Fallback stack |
+|------|--------|----------------|
+| Display | **Space Grotesk** | `"Space Grotesk", "IBM Plex Sans", system-ui, sans-serif` |
+| Body / UI | **IBM Plex Sans** | `"IBM Plex Sans", system-ui, -apple-system, sans-serif` |
+| Mono / data | **IBM Plex Mono** | `"IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace` |
+
+Load from Google Fonts (`fonts.googleapis.com` / `fonts.gstatic.com`) — Space Grotesk
+500/600/700, IBM Plex Sans 400/500/600, IBM Plex Mono 400/500.
+
+Type scale (1.200 minor-third, base 14px):
+
+| Token | Size / line-height | Weight | Use |
+|-------|--------------------|--------|-----|
+| `--t-display` | 34px / 38px | 600 | Page hero, stage title |
+| `--t-h1` | 24px / 30px | 600 | Section headers |
+| `--t-h2` | 19px / 26px | 600 | Card titles, entity names |
+| `--t-h3` | 16px / 22px | 600 | Sub-headers |
+| `--t-body` | 14px / 21px | 400 | Body, controls |
+| `--t-small` | 13px / 18px | 400 | Secondary |
+| `--t-mono` | 12.5px / 18px | 400 | Source refs, paths, field types |
+| `--t-eyebrow` | 11px / 14px | 600 | Eyebrows, measured labels — `letter-spacing: 0.14em; text-transform: uppercase` |
+
+Display headings use `letter-spacing: -0.01em`. Mono is used verbatim for all
+`file:line` source refs, HTTP paths, TS types, and generated file names — never body font.
+
+### 1.3 Spacing, radius, borders, shadow
+
+- **Spacing scale** (px): `2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 56, 72`. Tailwind maps to
+  `0.5,1,1.5,2,3,4,5,6,8,10,14,18`. Default panel padding `24`; tight controls `8–12`.
+- **Radius**: `--r-sm 4px`, `--r-md 6px`, `--r-lg 10px`, `--r-pill 999px`. Drafting cards
+  use `--r-md`; the app is precise, not pillowy — nothing above `10px` except pills/avatars.
+- **Borders**: default `1px solid var(--line)`. Emphasis `1px solid var(--rule)`. Accent
+  edges use the semantic accent at 1px. Focus ring: `2px solid var(--brass-400)` with
+  `outline-offset: 2px`.
+- **Shadow** (used sparingly — this is a flat drafting surface): `--shadow-pop:
+  0 8px 24px -8px rgba(0,0,0,.55)` for popovers/menus only. Cards are delineated by
+  border + surface step, not shadow.
+
+### 1.4 The drafting grid
+
+Canvas backgrounds carry a faint measured grid:
+```css
+background-color: var(--ink-800);
+background-image:
+  linear-gradient(var(--ink-500) 1px, transparent 1px),
+  linear-gradient(90deg, var(--ink-500) 1px, transparent 1px);
+background-size: 24px 24px;
+background-position: -1px -1px;
+opacity via a 0.35 overlay layer, never full-strength.
+```
+
+---
+
+## 2. Signature elements
+
+These are what Backbone is remembered by. Use them; do not invent alternatives.
+
+### 2.1 The measured spine
+A vertical ruled edge — the "backbone" — runs down the left of the app shell and of the
+Blueprint canvas: a `2px` `--rule` line overlaid with short tick marks every `24px`
+(`1px × 6px`, `--ink-400`) and, at stage boundaries, a mono measure label. It signals that
+everything is drafted to measure.
+
+### 2.2 Drafting cards (entities)
+Entities render as precise cards with **corner registration ticks** (an L-shaped `1px`
+mark in each corner, `--rule`), a mono entity header, and a ruled field table. Detected
+cards carry a `--detected` top edge (`2px`). Fields show `name`, mono `type`, a nullability
+dot, and relation markers. Enum fields list their literal values as mono chips.
+
+### 2.3 Relation connectors
+Relations draw as orthogonal SVG connectors (right-angle, never bezier) in `--rule`, with
+**cardinality glyphs** at each end: `1` (crow's-foot bar) and `∞` (crow's-foot fork).
+Many-to-many draws through a small join-table node.
+
+### 2.4 Measured labels / eyebrows
+Section eyebrows use `--t-eyebrow` with a leading tick glyph (`▏`) and often a mono
+count/coordinate, e.g. `▏ ENTITIES · 04` — labels encode real counts, not decoration.
+
+---
+
+## 3. Component patterns
+
+- **App shell**: fixed left rail (pipeline stages Analyze → Blueprint → Generate →
+  Regenerate, each a measured tick on the spine), top bar with frontend-path + runtime/arch
+  selector, main canvas. Rail width `248px`.
+- **Buttons**: primary = solid `--brass-500` on `--ink-900` text, `--r-md`, `600` weight,
+  height `36px`, padding `0 16px`. Secondary = `1px --rule` ghost on transparent, `--text`.
+  Generated actions (Generate) use `--verd-500` solid. Destructive = `--danger-500` ghost.
+  Disabled `opacity: .45`. Hover shifts to the `-400` accent; active to `-600`.
+- **Chips / tags**: `--r-pill`, `--t-eyebrow`, tinted background (`--brass-050`/`--verd-050`)
+  with a `1px` accent border and accent text. HTTP methods are chips: GET=info, POST=verd,
+  PUT/PATCH=brass, DELETE=danger.
+- **Toggles**: entities/fields/endpoints toggle in/out of generation via a switch; off =
+  `opacity .5` + strikethrough on the name. Track `--ink-500`, knob `--paper-100`, on =
+  `--verd-500`.
+- **Tables**: header row `--t-eyebrow` `--text-muted`, `1px --line` row rules, mono for
+  type/path columns, `12px` vertical cell padding.
+- **Source-ref links**: mono, `--info-500`, underline on hover, render `path:line`; clicking
+  reveals the source snippet in a popover.
+- **Code / report blocks**: mono on `--ink-800`, `1px --line`, `--r-md`, `16px` padding,
+  `overflow-x:auto`.
+- **Empty states**: a drafting-grid panel with a measured eyebrow, one plain sentence of
+  direction, and the single next action. Never a mood illustration.
+- **Diff rows**: left gutter glyph `+ / ~ / − / ·` in the diff palette colour, mono label.
+
+## 4. Interactive states & quality floor
+
+- Focus is always visible: `2px --brass-400` ring, `2px` offset. Never remove outlines.
+- Hover on interactive surfaces lifts background one ink step (`--ink-700`→`--ink-600`).
+- Transitions: `120ms ease` for colour/background, `180ms ease` for panel/disclosure.
+  Respect `prefers-reduced-motion: reduce` — drop transforms and non-essential transitions.
+- Responsive down to `768px`: the left rail collapses to a top strip; canvas scrolls.
+  Wide content (ERD, tables, code) scrolls inside its own `overflow-x:auto` container; the
+  page body never scrolls horizontally.
+- Keyboard: all toggles, selectors, and stage nav reachable and operable.
+
+## 5. Voice
+
+Plain, precise, engineering register. Sentence case. Name things by what the developer
+controls: "Detected 4 entities", "Generate backend", "Regenerate — 2 additive migrations".
+Errors state what happened and the fix, in the tool's voice, no apology. Empty screens
+invite the next action. Never sell; describe.
