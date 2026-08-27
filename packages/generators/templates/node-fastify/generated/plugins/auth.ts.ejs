@@ -1,0 +1,52 @@
+import fastifyJwt from "@fastify/jwt";
+import fp from "fastify-plugin";
+import type { FastifyReply, FastifyRequest } from "fastify";
+import { env } from "../config/env";
+
+/**
+ * Authentication plugin. Generated — do not edit.
+ *
+ * Wrapped with `fastify-plugin` so its registration is NOT encapsulated: the @fastify/jwt
+ * decorators (`request.jwtVerify`, `request.user`) and the `authenticate` preHandler decorated
+ * below are added to the ROOT instance and therefore visible to every route plugin registered
+ * afterwards (see routes/index.ts).
+ */
+
+// The JWT payload / verified-user shape carried on the request.
+// Roles in this Blueprint: <%= view.auth.roles.length ? view.auth.roles.join(", ") : "(none declared)" %>.
+export interface AuthPayload {
+  id: number;
+  email: string;
+  role: string;
+}
+
+// Teach TypeScript about the decorator and the typed `request.user`.
+declare module "fastify" {
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+declare module "@fastify/jwt" {
+  interface FastifyJWT {
+    payload: AuthPayload;
+    user: AuthPayload;
+  }
+}
+
+export const authPlugin = fp(async (fastify) => {
+  // Register @fastify/jwt with the shared secret. `sign.expiresIn` sets the default token lifetime
+  // so `fastify.jwt.sign(payload)` in the auth service produces expiring tokens.
+  await fastify.register(fastifyJwt, {
+    secret: env.JWT_SECRET,
+    sign: { expiresIn: env.JWT_EXPIRES_IN },
+  });
+
+  // A reusable preHandler: verifies the Bearer token (populating `request.user`) or answers 401.
+  fastify.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return reply.code(401).send({ error: "Invalid or missing authentication token" });
+    }
+  });
+});

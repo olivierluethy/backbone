@@ -1,0 +1,44 @@
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { ZodError } from "zod";
+
+/**
+ * Centralised error handling for the Fastify backend. Generated — do not edit.
+ *
+ * Unlike Express, Fastify natively awaits async route handlers and funnels any thrown or rejected
+ * error into a single error handler — so there is no `asyncHandler` wrapper here. Handlers simply
+ * `throw new HttpError(...)` (or let a zod `.parse()` throw) and the handler below turns it into a
+ * consistent JSON response.
+ */
+
+/** A domain error carrying an HTTP status code; thrown by services and controllers. */
+export class HttpError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "HttpError";
+  }
+}
+
+/**
+ * Register the application-wide error handler on a Fastify instance. Mapping:
+ *   - ZodError  -> 422 with the failing field paths and messages;
+ *   - HttpError -> its own status with the domain message;
+ *   - anything else -> 500, with the original error logged for diagnosis.
+ */
+export function registerErrorHandler(app: FastifyInstance): void {
+  app.setErrorHandler((err: unknown, _request: FastifyRequest, reply: FastifyReply) => {
+    if (err instanceof ZodError) {
+      return reply.code(422).send({
+        error: "Validation failed",
+        details: err.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+      });
+    }
+    if (err instanceof HttpError) {
+      return reply.code(err.status).send({ error: err.message });
+    }
+    app.log.error(err);
+    return reply.code(500).send({ error: "Internal server error" });
+  });
+}

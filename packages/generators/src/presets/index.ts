@@ -7,6 +7,7 @@ import {
 } from "@backbone/core";
 import type { Preset } from "../types.js";
 import { nodeExpressPresets } from "./node-express.js";
+import { nodeFastifyPresets } from "./node-fastify.js";
 import { phpPlainPresets } from "./php-plain.js";
 import { pythonFastapiPresets } from "./python-fastapi.js";
 import { pythonDjangoPresets } from "./python-django.js";
@@ -19,6 +20,7 @@ import { pythonDjangoPresets } from "./python-django.js";
  */
 const PRESETS: Preset[] = [
   ...nodeExpressPresets,
+  ...nodeFastifyPresets,
   ...phpPlainPresets,
   ...pythonFastapiPresets,
   ...pythonDjangoPresets,

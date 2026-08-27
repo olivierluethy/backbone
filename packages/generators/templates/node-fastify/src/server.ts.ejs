@@ -1,0 +1,47 @@
+import Fastify from "fastify";
+import { env } from "./generated/config/env";
+import { registerErrorHandler } from "./generated/lib/http-error";
+import { apiRoutes } from "./generated/routes/index";
+<% if (auth) { -%>
+import { authPlugin } from "./generated/plugins/auth";
+<% } -%>
+
+/**
+ * Application entry point. This file is YOURS — Backbone writes it once and never overwrites it.
+ * The generated API lives under `src/generated/` and is registered below as Fastify plugins; add
+ * your own decorators, plugins and routes where marked.
+ */
+async function main(): Promise<void> {
+  // Fastify's Pino logger is enabled so requests, errors and startup are observable out of the box.
+  const app = Fastify({ logger: true });
+
+  // Install the shared error handler first so every plugin registered afterwards inherits it:
+  // it maps zod validation errors (422), thrown HttpError instances, and anything else (500)
+  // onto consistent JSON responses.
+  registerErrorHandler(app);
+
+  // Simple liveness probe, handy for container/orchestrator health checks.
+  app.get("/health", async () => ({ status: "ok" }));
+
+<% if (auth) { -%>
+  // Auth plugin (@fastify/jwt + an `authenticate` preHandler). Registered with fastify-plugin so
+  // the `authenticate` decorator lives on the root instance and is visible to the route plugins.
+  // It must be registered BEFORE the API routes that reference `fastify.authenticate`.
+  await app.register(authPlugin);
+
+<% } -%>
+  // --- Backbone-generated API (entities<% if (auth) { %> + auth endpoints<% } %>) ---
+  await app.register(apiRoutes);
+
+  // --- Register your own plugins/routes here ---
+
+  try {
+    await app.listen({ port: env.PORT, host: "0.0.0.0" });
+    app.log.info(`Backbone Fastify backend listening on http://localhost:${env.PORT}`);
+  } catch (err) {
+    app.log.error(err);
+    process.exit(1);
+  }
+}
+
+void main();

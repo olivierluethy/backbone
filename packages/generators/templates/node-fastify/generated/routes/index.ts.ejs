@@ -1,0 +1,22 @@
+import type { FastifyInstance } from "fastify";
+<% for (const e of view.entities) { -%>
+import { <%= e.varName %>Routes } from "./<%= e.varName %>.routes";
+<% } -%>
+<% if (auth) { -%>
+import { authRoutes } from "../auth/auth.routes";
+<% } -%>
+
+/**
+ * Aggregate API plugin — registers every generated entity route plugin<% if (auth) { %> plus the auth routes<% } %> onto the
+ * Fastify instance. Generated — do not edit. Mounted once from src/server.ts.
+ */
+export async function apiRoutes(fastify: FastifyInstance): Promise<void> {
+<% if (auth) { -%>
+  // Public + protected auth endpoints (register / login / me).
+  await fastify.register(authRoutes);
+<% } -%>
+<% for (const e of view.entities) { -%>
+  // <%= e.name %> endpoints (table `<%= e.table %>`).
+  await fastify.register(<%= e.varName %>Routes);
+<% } -%>
+}

@@ -1,0 +1,69 @@
+import bcrypt from "bcryptjs";
+import { db } from "../config/db";
+import { HttpError } from "../lib/http-error";
+import type { AuthPayload } from "../plugins/auth";
+
+/**
+ * Authentication business logic over the reserved `users` table. Generated — do not edit.
+ *
+ * Token SIGNING is delegated to @fastify/jwt: because signing needs the Fastify instance, the
+ * service is built by `createAuthService(sign)` where `sign` is `fastify.jwt.sign` (wired up in
+ * auth.routes.ts). Password hashing uses bcrypt; verification of incoming tokens is handled by the
+ * `authenticate` preHandler in plugins/auth.ts.
+ */
+const TABLE = "users";
+// New registrations receive this default role (first role declared in the Blueprint).
+const DEFAULT_ROLE = "<%= view.auth.roles[0] || "member" %>";
+
+/** Signs a JWT for the given payload and returns the encoded token. */
+export type SignToken = (payload: AuthPayload) => string;
+
+interface UserRow {
+  id: number;
+  email: string;
+  passwordHash: string;
+  role: string;
+}
+
+/** Strip secrets: only id/email/role are ever returned to the client. */
+function publicUser(u: UserRow): AuthPayload {
+  return { id: u.id, email: u.email, role: u.role };
+}
+
+export function createAuthService(sign: SignToken) {
+  return {
+    /** Register a new user: reject duplicates, hash the password, persist, and issue a token. */
+    async register(input: { email: string; password: string<% for (const c of view.authUserExtraColumns) { %>; <%= c.field %>?: <%= c.tsType %><% } %> }) {
+      const existing = await db(TABLE).where({ email: input.email }).first();
+      if (existing) throw new HttpError(409, "Email already registered");
+      const passwordHash = await bcrypt.hash(input.password, 10);
+      const [id] = await db(TABLE).insert({
+        email: input.email,
+        passwordHash,
+        role: DEFAULT_ROLE,
+<% for (const c of view.authUserExtraColumns) { -%>
+        <%= c.field %>: input.<%= c.field %> ?? null,
+<% } -%>
+        createdAt: new Date().toISOString(),
+      });
+      const user = (await db(TABLE).where({ id }).first()) as UserRow;
+      return { token: sign(publicUser(user)), user: publicUser(user) };
+    },
+
+    /** Log in: verify the password against the stored hash and issue a token. */
+    async login(input: { email: string; password: string }) {
+      const user = (await db(TABLE).where({ email: input.email }).first()) as UserRow | undefined;
+      if (!user) throw new HttpError(401, "Invalid credentials");
+      const ok = await bcrypt.compare(input.password, user.passwordHash);
+      if (!ok) throw new HttpError(401, "Invalid credentials");
+      return { token: sign(publicUser(user)), user: publicUser(user) };
+    },
+
+    /** Return the current user's public profile (used by GET /auth/me). */
+    async me(id: number) {
+      const user = (await db(TABLE).where({ id }).first()) as UserRow | undefined;
+      if (!user) throw new HttpError(404, "User not found");
+      return publicUser(user);
+    },
+  };
+}
